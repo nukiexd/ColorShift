@@ -10,7 +10,7 @@ import {
   MAX_XP,
   TILE_COLORS,
 } from '../game/balance';
-import { GameSession } from '../game/session';
+import { GameSession, tileIdNamespaceFor } from '../game/session';
 import { Special, TileColor } from '../game/model';
 import { findLegalMoves } from '../game/board';
 import { findMatches } from '../game/matches';
@@ -78,19 +78,84 @@ function parseSettings(value: unknown): Settings | null {
 
 function parseSession(value: unknown): GameSession | null {
   if (!isRecord(value) || (value.phase !== 'idle' && value.phase !== 'paused') || !isBoard(value.board)
-    || typeof value.sessionId !== 'string' || value.sessionId.length === 0 || value.sessionId.length > MAX_SESSION_ID_LENGTH
     || !isBoundedInteger(value.score, 0, MAX_SCORE) || !isBoundedInteger(value.bestCascade, 0, MAX_SCORE)
     || !isBoundedInteger(value.clearedTiles, 0, MAX_SCORE)
     || (value.backgroundColor !== null && !isTileColor(value.backgroundColor))
-    || !isUint32(value.randomState) || !isBoundedInteger(value.tileIdCounter, 0, MAX_TILE_ID_COUNTER - 1)
-    || !isBoundedInteger(value.tileIdGeneration, 0, MAX_TILE_ID_GENERATION)
-    || (value.tileIdGeneration === MAX_TILE_ID_GENERATION
-      && MAX_TILE_ID_COUNTER - value.tileIdCounter <= MAX_TILE_IDS_PER_MOVE)
-    || typeof value.tileIdNamespace !== 'string' || value.tileIdNamespace.length === 0
-    || value.tileIdNamespace.length > MAX_TILE_ID_NAMESPACE_LENGTH
+    || !isUint32(value.randomState)) return null;
+  const allocator = parseAllocatorMetadata(value);
+  if (!allocator || (allocator.tileIdGeneration === MAX_TILE_ID_GENERATION
+    && MAX_TILE_ID_COUNTER - allocator.tileIdCounter <= MAX_TILE_IDS_PER_MOVE)
     || findMatches(value.board as unknown as GameSession['board']).length > 0
     || findLegalMoves(value.board as unknown as GameSession['board']).length === 0) return null;
-  return value as unknown as GameSession;
+  return { ...value, ...allocator } as unknown as GameSession;
+}
+
+interface AllocatorMetadata {
+  readonly sessionId: string;
+  readonly tileIdCounter: number;
+  readonly tileIdGeneration: number;
+  readonly tileIdNamespace: string;
+}
+
+function parseAllocatorMetadata(value: Record<string, unknown>): AllocatorMetadata | null {
+  if (!isBoundedInteger(value.tileIdCounter, 0, MAX_TILE_ID_COUNTER - 1)
+    || typeof value.tileIdNamespace !== 'string' || value.tileIdNamespace.length === 0
+    || value.tileIdNamespace.length > MAX_TILE_ID_NAMESPACE_LENGTH) return null;
+
+  if (!hasOwn(value, 'tileIdGeneration')) return migratePreGenerationMetadata(value);
+  if (typeof value.sessionId !== 'string' || value.sessionId.length === 0 || value.sessionId.length > MAX_SESSION_ID_LENGTH
+    || !isBoundedInteger(value.tileIdGeneration, 0, MAX_TILE_ID_GENERATION)) return null;
+
+  const canonicalNamespace = tileIdNamespaceFor(value.sessionId, value.tileIdGeneration);
+  if (value.tileIdNamespace === canonicalNamespace) {
+    return {
+      sessionId: value.sessionId,
+      tileIdCounter: value.tileIdCounter,
+      tileIdGeneration: value.tileIdGeneration,
+      tileIdNamespace: canonicalNamespace,
+    };
+  }
+  if (!isActualPriorMetadata(value.sessionId, value.tileIdGeneration, value.tileIdNamespace)) return null;
+  return {
+    sessionId: value.sessionId,
+    tileIdCounter: 0,
+    tileIdGeneration: value.tileIdGeneration,
+    tileIdNamespace: canonicalNamespace,
+  };
+}
+
+function migratePreGenerationMetadata(value: Record<string, unknown>): AllocatorMetadata | null {
+  const legacySeed = legacyNamespaceSeed(value.tileIdNamespace as string);
+  if (legacySeed === null || !isBoundedInteger(value.tileIdCounter, 0, MAX_TILE_ID_COUNTER - 1)
+    || !isUint32(value.randomState)) return null;
+  const legacyBase = `session-${legacySeed}`;
+  let sessionId: string;
+  if (!hasOwn(value, 'sessionId')) {
+    sessionId = `legacy-${legacySeed}-${value.randomState.toString(36)}-${value.tileIdCounter.toString(36)}`;
+  } else if (typeof value.sessionId === 'string' && isActualPriorSessionId(legacyBase, value.sessionId)) {
+    sessionId = value.sessionId;
+  } else {
+    return null;
+  }
+  if (sessionId.length > MAX_SESSION_ID_LENGTH) return null;
+  return { sessionId, tileIdCounter: 0, tileIdGeneration: 0, tileIdNamespace: tileIdNamespaceFor(sessionId, 0) };
+}
+
+function isActualPriorMetadata(sessionId: string, generation: number, namespace: string): boolean {
+  const baseMatch = /^(session-(?:0|[1-9]\d{0,9}))/.exec(sessionId);
+  if (!baseMatch || legacyNamespaceSeed(baseMatch[1]) === null || !isActualPriorSessionId(baseMatch[1], sessionId)) return false;
+  return generation === 0 ? namespace === baseMatch[1] : namespace === `${sessionId}-refill-${generation}`;
+}
+
+function isActualPriorSessionId(base: string, sessionId: string): boolean {
+  return sessionId === base
+    || new RegExp(`^${base}-(?:_r_[0-9a-z]+_|:r[0-9a-z]+:)-\\d+$`, 'i').test(sessionId);
+}
+
+function legacyNamespaceSeed(namespace: string): string | null {
+  const match = /^session-(0|[1-9]\d{0,9})$/.exec(namespace);
+  if (!match || Number(match[1]) > 0xffffffff) return null;
+  return match[1];
 }
 
 function isBoard(value: unknown): boolean {
@@ -117,6 +182,10 @@ function isSpecial(value: unknown): value is Special {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function hasOwn(value: Record<string, unknown>, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(value, key);
 }
 
 function isNonnegativeInteger(value: unknown): value is number {

@@ -67,10 +67,10 @@ export function AppProvider({ children, seedFactory }: AppProviderProps) {
   }, [hydrated, state]);
 
   const makeSession = useCallback(() => {
-    const session = createSession(seedFactory ? seedFactory() : nextSeed.current++);
-    const sessionId = `${session.sessionId}-${providerToken}-${nextSessionIdentity.current}`;
+    const seed = seedFactory ? seedFactory() : nextSeed.current++;
+    const sessionId = `session-${seed >>> 0}-${providerToken}-${nextSessionIdentity.current}`;
     nextSessionIdentity.current += 1;
-    return { ...session, sessionId };
+    return createSession(seed, sessionId);
   }, [providerToken, seedFactory]);
 
   const startGame = useCallback(() => {

@@ -105,6 +105,75 @@ describe('persisted state schema', () => {
     expect(restored).toBeNull();
   });
 
+  test('migrates genuine legacy v1 allocator metadata and keeps the session playable', () => {
+    const current = createSession(29);
+    const { sessionId: _sessionId, tileIdGeneration: _generation, ...preIdentitySession } = current;
+    const legacyPreIdentity = { ...preIdentitySession, tileIdNamespace: 'session-29' };
+    const restored = parsePersistedState({ ...createDefaultState(), activeSession: legacyPreIdentity }).activeSession;
+    expect(restored).not.toBeNull();
+    expect(restored).toMatchObject({ tileIdCounter: 0, tileIdGeneration: 0 });
+    expect(restored!.tileIdNamespace).toBe(`cs2-${restored!.sessionId}-g0`);
+    const [from, to] = findLegalMoves(restored!.board)[0];
+    const next = commitMove(restored!, from, to);
+    expect(next.score).toBeGreaterThan(0);
+    expect(parsePersistedState({ ...createDefaultState(), activeSession: next }).activeSession).toEqual(next);
+
+    const { tileIdGeneration: _providerGeneration, ...preGenerationSession } = current;
+    const legacyProvider = {
+      ...preGenerationSession,
+      sessionId: `${current.sessionId}-_r_0_-1`,
+      tileIdNamespace: current.sessionId,
+    };
+    const providerRestored = parsePersistedState({ ...createDefaultState(), activeSession: legacyProvider }).activeSession;
+    expect(providerRestored).toMatchObject({ sessionId: legacyProvider.sessionId, tileIdCounter: 0, tileIdGeneration: 0 });
+    expect(providerRestored!.tileIdNamespace).toBe(`cs2-${legacyProvider.sessionId}-g0`);
+
+    const priorRollover = {
+      ...current,
+      tileIdCounter: 12,
+      tileIdGeneration: 1,
+      tileIdNamespace: `${current.sessionId}-refill-1`,
+    };
+    expect(parsePersistedState({ ...createDefaultState(), activeSession: priorRollover }).activeSession).toMatchObject({
+      sessionId: current.sessionId,
+      tileIdCounter: 0,
+      tileIdGeneration: 1,
+      tileIdNamespace: `cs2-${current.sessionId}-g1`,
+    });
+  });
+
+  test('rejects modern allocator metadata whose namespace does not match its generation', () => {
+    const session = createSession(2);
+    const mismatched = { ...session, tileIdNamespace: `${session.sessionId}-refill-1` };
+    expect(parsePersistedState({ ...createDefaultState(), activeSession: mismatched }).activeSession).toBeNull();
+  });
+
+  test('does not migrate allocator metadata that prior v1 code could not emit', () => {
+    const session = createSession(2);
+    const impossibleLegacy = {
+      ...session,
+      sessionId: 'session-4294967296',
+      tileIdNamespace: 'session-4294967296',
+    };
+    expect(parsePersistedState({ ...createDefaultState(), activeSession: impossibleLegacy }).activeSession).toBeNull();
+  });
+
+  test('migrates legacy provider identities emitted by the web renderer', () => {
+    const current = createSession(29);
+    const { tileIdGeneration: _generation, ...legacy } = current;
+    const legacySessionId = 'session-29-:r0:-1';
+    const restored = parsePersistedState({
+      ...createDefaultState(),
+      activeSession: { ...legacy, sessionId: legacySessionId, tileIdNamespace: 'session-29' },
+    }).activeSession;
+    expect(restored).toMatchObject({
+      sessionId: legacySessionId,
+      tileIdCounter: 0,
+      tileIdGeneration: 0,
+      tileIdNamespace: `cs2-${legacySessionId}-g0`,
+    });
+  });
+
   test('keeps an engine session persistable when scoring reaches the runtime ceiling', () => {
     const session = { ...createSession(2), score: MAX_SCORE - 100 };
     const [from, to] = findLegalMoves(session.board)[0];

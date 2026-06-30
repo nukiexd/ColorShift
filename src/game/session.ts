@@ -32,11 +32,15 @@ export interface LevelProgress {
   readonly xp: number;
 }
 
-export function createSession(seed = 0): GameSession {
+export function tileIdNamespaceFor(sessionId: string, generation: number): string {
+  return `cs2-${sessionId}-g${generation}`;
+}
+
+export function createSession(seed = 0, sessionId = `session-${seed >>> 0}`): GameSession {
   const random = createSeededRandom(seed);
   const board = createBoard(random);
   return {
-    sessionId: `session-${seed >>> 0}`,
+    sessionId,
     board,
     score: 0,
     bestCascade: 0,
@@ -46,7 +50,7 @@ export function createSession(seed = 0): GameSession {
     randomState: random.getState(),
     tileIdCounter: 0,
     tileIdGeneration: 0,
-    tileIdNamespace: `session-${seed >>> 0}`,
+    tileIdNamespace: tileIdNamespaceFor(sessionId, 0),
   };
 }
 
@@ -60,7 +64,7 @@ export function commitMove(session: GameSession, from: Coord, to: Coord): GameSe
     if (tileIdGeneration >= MAX_TILE_ID_GENERATION) return session;
     tileIdGeneration += 1;
     tileIdCounter = 0;
-    tileIdNamespace = `${session.sessionId}-refill-${tileIdGeneration}`;
+    tileIdNamespace = tileIdNamespaceFor(session.sessionId, tileIdGeneration);
   }
   const tileIds = createTileIdSource(tileIdCounter, tileIdNamespace);
   const resolution = resolveMove(session.board, from, to, random, tileIds);

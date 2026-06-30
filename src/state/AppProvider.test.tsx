@@ -23,6 +23,7 @@ describe('AppProvider', () => {
     await act(() => { result.current.startGame(); });
     const original = result.current.activeSession;
     expect(original).not.toBeNull();
+    expect(original!.tileIdNamespace).toBe(`cs2-${original!.sessionId}-g0`);
     await act(() => { result.current.startGame(); });
     expect(result.current.activeSession).toBe(original);
     await act(() => { expect(result.current.updateNickname('x')).toBe(false); });
