@@ -98,6 +98,12 @@ describe('persisted state schema', () => {
     }).activeSession).toBeNull();
   });
 
+  test('recovers a persisted paused terminal epoch to idle without losing the session', () => {
+    const paused = { ...createSession(2), phase: 'paused' as const, sessionEpoch: MAX_SESSION_EPOCH };
+    expect(parsePersistedState({ ...createDefaultState(), activeSession: paused }).activeSession)
+      .toEqual({ ...paused, phase: 'idle' });
+  });
+
   test('rejects impossible profile XP and cascade statistics without damaging valid segments', () => {
     const state = createDefaultState();
     const settings = { effectsVolume: 0.7, haptics: false, reducedMotion: true };

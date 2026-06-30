@@ -124,6 +124,10 @@ function boardsEqual(first: Board, second: Board): boolean {
 }
 
 export function advanceSessionEpoch(session: GameSession, phase: 'idle' | 'paused'): GameSession {
+  if (phase === 'paused' && session.sessionEpoch >= MAX_SESSION_EPOCH - 1) return session;
+  if (phase === 'idle' && session.phase === 'paused' && session.sessionEpoch === MAX_SESSION_EPOCH) {
+    return { ...session, phase };
+  }
   if (session.sessionEpoch >= MAX_SESSION_EPOCH) return session;
   return { ...session, phase, sessionEpoch: session.sessionEpoch + 1 };
 }

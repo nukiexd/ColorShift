@@ -1,5 +1,5 @@
 import { findLegalMoves } from './board';
-import { commitMove, createSession, applyXp, xpForScore, xpRequiredForLevel } from './session';
+import { advanceSessionEpoch, commitMove, createSession, applyXp, xpForScore, xpRequiredForLevel } from './session';
 import {
   MAX_CASCADES,
   MAX_LEVEL,
@@ -117,6 +117,26 @@ describe('game session', () => {
     const session = { ...createSession(2), bestCascade: MAX_CASCADES + 1 };
     const [from, to] = findLegalMoves(session.board)[0];
     expect(commitMove(session, from, to).bestCascade).toBe(MAX_CASCADES);
+  });
+
+  test('reserves terminal epoch headroom for a complete pause and resume cycle', () => {
+    const cannotPause = { ...createSession(2), sessionEpoch: MAX_SESSION_EPOCH - 1 };
+    expect(advanceSessionEpoch(cannotPause, 'paused')).toBe(cannotPause);
+
+    const resumable = { ...createSession(2), sessionEpoch: MAX_SESSION_EPOCH - 2 };
+    const paused = advanceSessionEpoch(resumable, 'paused');
+    expect(paused).toMatchObject({ phase: 'paused', sessionEpoch: MAX_SESSION_EPOCH - 1 });
+    const resumed = advanceSessionEpoch(paused, 'idle');
+    expect(resumed).toMatchObject({ phase: 'idle', sessionEpoch: MAX_SESSION_EPOCH });
+    expect(advanceSessionEpoch(resumed, 'paused')).toBe(resumed);
+  });
+
+  test('recovers a legacy paused terminal epoch without incrementing it', () => {
+    const legacy = { ...createSession(2), phase: 'paused' as const, sessionEpoch: MAX_SESSION_EPOCH };
+    expect(advanceSessionEpoch(legacy, 'idle')).toMatchObject({
+      phase: 'idle',
+      sessionEpoch: MAX_SESSION_EPOCH,
+    });
   });
 
   test('bounds malformed and oversized progression inputs in constant time', () => {

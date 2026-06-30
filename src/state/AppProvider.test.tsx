@@ -282,13 +282,43 @@ describe('AppProvider', () => {
     await act(() => { expect(result.current.settleSession(current, resumedFrom, resumedTo)).toBe(true); });
   });
 
-  test('does not overflow the causal epoch at its terminal bound', async () => {
+  test('refuses to pause when no epoch remains for a later resume', async () => {
     expect(MAX_SESSION_EPOCH).toBeDefined();
-    const terminal = { ...createSession(2), sessionEpoch: MAX_SESSION_EPOCH };
-    storage.getItem.mockResolvedValueOnce(JSON.stringify({ ...createDefaultState(), activeSession: terminal }));
+    const nearTerminal = { ...createSession(2), sessionEpoch: MAX_SESSION_EPOCH - 1 };
+    storage.getItem.mockResolvedValueOnce(JSON.stringify({ ...createDefaultState(), activeSession: nearTerminal }));
     const wrapper = ({ children }: PropsWithChildren) => <AppProvider>{children}</AppProvider>;
     const { result } = await renderHook(() => useApp(), { wrapper });
     await waitFor(() => expect(result.current.hydrated).toBe(true));
+    await act(() => { result.current.pauseGame(); });
+    expect(result.current.activeSession).toMatchObject({ phase: 'idle', sessionEpoch: MAX_SESSION_EPOCH - 1 });
+  });
+
+  test('hydrates and persists a legacy paused terminal epoch as safely resumed', async () => {
+    const legacy = { ...createSession(2), phase: 'paused' as const, sessionEpoch: MAX_SESSION_EPOCH };
+    storage.getItem.mockResolvedValueOnce(JSON.stringify({ ...createDefaultState(), activeSession: legacy }));
+    const wrapper = ({ children }: PropsWithChildren) => <AppProvider>{children}</AppProvider>;
+    const { result } = await renderHook(() => useApp(), { wrapper });
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+    expect(result.current.activeSession).toMatchObject({ phase: 'idle', sessionEpoch: MAX_SESSION_EPOCH });
+    await act(() => {
+      expect(result.current.continueGame()).toMatchObject({ phase: 'idle', sessionEpoch: MAX_SESSION_EPOCH });
+    });
+    await waitFor(() => {
+      const saved = JSON.parse(storage.setItem.mock.calls.at(-1)![1]);
+      expect(saved.activeSession).toMatchObject({ phase: 'idle', sessionEpoch: MAX_SESSION_EPOCH });
+    });
+  });
+
+  test('uses the final two epochs for one pause and resume cycle', async () => {
+    const resumable = { ...createSession(2), sessionEpoch: MAX_SESSION_EPOCH - 2 };
+    storage.getItem.mockResolvedValueOnce(JSON.stringify({ ...createDefaultState(), activeSession: resumable }));
+    const wrapper = ({ children }: PropsWithChildren) => <AppProvider>{children}</AppProvider>;
+    const { result } = await renderHook(() => useApp(), { wrapper });
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+    await act(() => { result.current.pauseGame(); });
+    expect(result.current.activeSession).toMatchObject({ phase: 'paused', sessionEpoch: MAX_SESSION_EPOCH - 1 });
+    await act(() => { result.current.resumeGame(); });
+    expect(result.current.activeSession).toMatchObject({ phase: 'idle', sessionEpoch: MAX_SESSION_EPOCH });
     await act(() => { result.current.pauseGame(); });
     expect(result.current.activeSession).toMatchObject({ phase: 'idle', sessionEpoch: MAX_SESSION_EPOCH });
   });

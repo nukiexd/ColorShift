@@ -104,7 +104,7 @@ export function parseGameSession(value: unknown): GameSession | null {
     bestCascade: value.bestCascade as number,
     clearedTiles: value.clearedTiles as number,
     backgroundColor: value.backgroundColor as TileColor | null,
-    phase: value.phase,
+    phase: value.phase === 'paused' && sessionEpoch === MAX_SESSION_EPOCH ? 'idle' : value.phase,
     randomState: value.randomState as number,
     tileIdCounter: allocator.tileIdCounter,
     tileIdGeneration: allocator.tileIdGeneration,
