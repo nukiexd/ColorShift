@@ -1,4 +1,4 @@
-import { MAX_BOARD_GENERATION_ATTEMPTS, TILE_COLORS } from './balance';
+import { MAX_BOARD_GENERATION_ATTEMPTS, MAX_CASCADES, TILE_COLORS } from './balance';
 import { areAdjacent, createBoard, findLegalMoves, getCell, swapCells } from './board';
 import { findMatches } from './matches';
 import {
@@ -16,7 +16,6 @@ import {
 import { expandSpecialClears } from './specials';
 import { createSeededRandom, createTileIdSource } from './random';
 
-const MAX_CASCADES = 200;
 const defaultTileIds = createTileIdSource();
 
 export function applyGravityAndRefill(board: Board, random: RandomSource, tileIds: TileIdSource = defaultTileIds): Board {

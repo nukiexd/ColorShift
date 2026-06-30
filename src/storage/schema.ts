@@ -1,4 +1,15 @@
-import { BOARD_SIZE, MAX_LEVEL, MAX_SCORE, MAX_TILE_ID_COUNTER, MAX_XP, TILE_COLORS } from '../game/balance';
+import {
+  BOARD_SIZE,
+  MAX_LEVEL,
+  MAX_SESSION_ID_LENGTH,
+  MAX_SCORE,
+  MAX_TILE_ID_COUNTER,
+  MAX_TILE_ID_GENERATION,
+  MAX_TILE_IDS_PER_MOVE,
+  MAX_TILE_ID_NAMESPACE_LENGTH,
+  MAX_XP,
+  TILE_COLORS,
+} from '../game/balance';
 import { GameSession } from '../game/session';
 import { Special, TileColor } from '../game/model';
 import { findLegalMoves } from '../game/board';
@@ -67,12 +78,16 @@ function parseSettings(value: unknown): Settings | null {
 
 function parseSession(value: unknown): GameSession | null {
   if (!isRecord(value) || (value.phase !== 'idle' && value.phase !== 'paused') || !isBoard(value.board)
-    || typeof value.sessionId !== 'string' || value.sessionId.length === 0 || value.sessionId.length > 64
+    || typeof value.sessionId !== 'string' || value.sessionId.length === 0 || value.sessionId.length > MAX_SESSION_ID_LENGTH
     || !isBoundedInteger(value.score, 0, MAX_SCORE) || !isBoundedInteger(value.bestCascade, 0, MAX_SCORE)
     || !isBoundedInteger(value.clearedTiles, 0, MAX_SCORE)
     || (value.backgroundColor !== null && !isTileColor(value.backgroundColor))
     || !isUint32(value.randomState) || !isBoundedInteger(value.tileIdCounter, 0, MAX_TILE_ID_COUNTER - 1)
-    || typeof value.tileIdNamespace !== 'string' || value.tileIdNamespace.length === 0 || value.tileIdNamespace.length > 64
+    || !isBoundedInteger(value.tileIdGeneration, 0, MAX_TILE_ID_GENERATION)
+    || (value.tileIdGeneration === MAX_TILE_ID_GENERATION
+      && MAX_TILE_ID_COUNTER - value.tileIdCounter <= MAX_TILE_IDS_PER_MOVE)
+    || typeof value.tileIdNamespace !== 'string' || value.tileIdNamespace.length === 0
+    || value.tileIdNamespace.length > MAX_TILE_ID_NAMESPACE_LENGTH
     || findMatches(value.board as unknown as GameSession['board']).length > 0
     || findLegalMoves(value.board as unknown as GameSession['board']).length === 0) return null;
   return value as unknown as GameSession;

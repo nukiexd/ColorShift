@@ -2,7 +2,14 @@ import { createBoard } from './board';
 import { Board, Coord, TileColor } from './model';
 import { createSeededRandom, createTileIdSource } from './random';
 import { resolveMove } from './resolve';
-import { MAX_LEVEL, MAX_SCORE, MAX_XP } from './balance';
+import {
+  MAX_LEVEL,
+  MAX_SCORE,
+  MAX_TILE_ID_COUNTER,
+  MAX_TILE_ID_GENERATION,
+  MAX_TILE_IDS_PER_MOVE,
+  MAX_XP,
+} from './balance';
 
 export type SessionPhase = 'idle' | 'preview' | 'swapping' | 'clearing' | 'falling' | 'shuffling' | 'paused';
 
@@ -16,6 +23,7 @@ export interface GameSession {
   readonly phase: SessionPhase;
   readonly randomState: number;
   readonly tileIdCounter: number;
+  readonly tileIdGeneration: number;
   readonly tileIdNamespace: string;
 }
 
@@ -37,6 +45,7 @@ export function createSession(seed = 0): GameSession {
     phase: 'idle',
     randomState: random.getState(),
     tileIdCounter: 0,
+    tileIdGeneration: 0,
     tileIdNamespace: `session-${seed >>> 0}`,
   };
 }
@@ -44,20 +53,34 @@ export function createSession(seed = 0): GameSession {
 export function commitMove(session: GameSession, from: Coord, to: Coord): GameSession {
   if (session.phase !== 'idle') return session;
   const random = createSeededRandom(session.randomState);
-  const tileIds = createTileIdSource(session.tileIdCounter, session.tileIdNamespace);
+  let tileIdCounter = session.tileIdCounter;
+  let tileIdGeneration = session.tileIdGeneration;
+  let tileIdNamespace = session.tileIdNamespace;
+  if (MAX_TILE_ID_COUNTER - tileIdCounter <= MAX_TILE_IDS_PER_MOVE) {
+    if (tileIdGeneration >= MAX_TILE_ID_GENERATION) return session;
+    tileIdGeneration += 1;
+    tileIdCounter = 0;
+    tileIdNamespace = `${session.sessionId}-refill-${tileIdGeneration}`;
+  }
+  const tileIds = createTileIdSource(tileIdCounter, tileIdNamespace);
   const resolution = resolveMove(session.board, from, to, random, tileIds);
   if (!resolution.accepted) return session;
+  if (tileIdGeneration === MAX_TILE_ID_GENERATION
+    && MAX_TILE_ID_COUNTER - tileIds.getCounter() <= MAX_TILE_IDS_PER_MOVE) return session;
   const lastPhase = resolution.phases.at(-1);
   return {
     ...session,
     board: resolution.board,
-    score: session.score + resolution.scoreDelta,
-    bestCascade: Math.max(session.bestCascade, ...resolution.phases.map((phase) => phase.cascade)),
-    clearedTiles: session.clearedTiles + resolution.phases.reduce((sum, phase) => sum + new Set(phase.cleared.map(({ row, col }) => `${row},${col}`)).size, 0),
+    score: boundedSum(session.score, resolution.scoreDelta),
+    bestCascade: Math.min(MAX_SCORE, Math.max(session.bestCascade, ...resolution.phases.map((phase) => phase.cascade))),
+    clearedTiles: boundedSum(session.clearedTiles,
+      resolution.phases.reduce((sum, phase) => sum + new Set(phase.cleared.map(({ row, col }) => `${row},${col}`)).size, 0)),
     backgroundColor: lastPhase?.backgroundColor ?? session.backgroundColor,
     phase: 'idle',
     randomState: random.getState(),
     tileIdCounter: tileIds.getCounter(),
+    tileIdGeneration,
+    tileIdNamespace,
   };
 }
 
@@ -92,4 +115,8 @@ function cumulativeXpBefore(level: number): number {
 function normalizeInteger(value: number, minimum: number, maximum: number, fallback: number): number {
   if (!Number.isFinite(value)) return fallback;
   return Math.min(maximum, Math.max(minimum, Math.trunc(value)));
+}
+
+function boundedSum(current: number, increase: number): number {
+  return Math.min(MAX_SCORE, current + increase);
 }

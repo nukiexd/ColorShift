@@ -1,7 +1,8 @@
-import { createSession } from '../game/session';
+import { commitMove, createSession, xpForScore } from '../game/session';
 import { createDefaultState, parsePersistedState } from './schema';
-import { MAX_LEVEL, MAX_SCORE, MAX_TILE_ID_COUNTER, MAX_XP } from '../game/balance';
+import { MAX_LEVEL, MAX_SCORE, MAX_TILE_ID_COUNTER, MAX_TILE_IDS_PER_MOVE, MAX_XP } from '../game/balance';
 import { Board, Tile, TileColor } from '../game/model';
+import { findLegalMoves } from '../game/board';
 
 const deadColors: TileColor[][] = [
   ['coral', 'sky', 'mint', 'sun', 'plum', 'coral'],
@@ -66,6 +67,52 @@ describe('persisted state schema', () => {
     const state = createDefaultState();
     expect(parsePersistedState({ ...state, profile: { ...state.profile, level: MAX_LEVEL + 1, xp: MAX_XP + 1, bestScore: MAX_SCORE + 1 } }).profile).toEqual(state.profile);
     expect(parsePersistedState({ ...state, activeSession: { ...createSession(7), tileIdCounter: MAX_TILE_ID_COUNTER } }).activeSession).toBeNull();
+  });
+
+  test('restores a near-exhausted allocator without crashing on the next valid move', () => {
+    const session = createSession(2);
+    const restored = parsePersistedState({
+      ...createDefaultState(),
+      activeSession: { ...session, tileIdCounter: MAX_TILE_ID_COUNTER - 1 },
+    }).activeSession;
+    expect(restored).not.toBeNull();
+    const [from, to] = findLegalMoves(restored!.board)[0];
+    let next!: ReturnType<typeof commitMove>;
+    expect(() => { next = commitMove(restored!, from, to); }).not.toThrow();
+    expect(next.tileIdNamespace).not.toBe(restored!.tileIdNamespace);
+    expect(next.tileIdCounter).toBeLessThan(MAX_TILE_ID_COUNTER);
+    const ids = next.board.flatMap((row) => row.map((tile) => tile!.id));
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  test('rolls the allocator namespace at the exact per-move reserve boundary', () => {
+    const session = createSession(2);
+    const restored = parsePersistedState({
+      ...createDefaultState(),
+      activeSession: { ...session, tileIdCounter: MAX_TILE_ID_COUNTER - MAX_TILE_IDS_PER_MOVE },
+    }).activeSession!;
+    const [from, to] = findLegalMoves(restored.board)[0];
+    const next = commitMove(restored, from, to);
+    expect(next.tileIdNamespace).not.toBe(restored.tileIdNamespace);
+  });
+
+  test('rejects session identities too long for a bounded rollover namespace', () => {
+    const session = createSession(2);
+    const restored = parsePersistedState({
+      ...createDefaultState(),
+      activeSession: { ...session, sessionId: 's'.repeat(64), tileIdCounter: MAX_TILE_ID_COUNTER - 1 },
+    }).activeSession;
+    expect(restored).toBeNull();
+  });
+
+  test('keeps an engine session persistable when scoring reaches the runtime ceiling', () => {
+    const session = { ...createSession(2), score: MAX_SCORE - 100 };
+    const [from, to] = findLegalMoves(session.board)[0];
+    const next = commitMove(session, from, to);
+    expect(next.score).toBe(MAX_SCORE);
+    expect(xpForScore(next.score)).toBe(Math.floor(10 * Math.sqrt(next.score / 1000)));
+    const restored = parsePersistedState({ ...createDefaultState(), activeSession: next }).activeSession;
+    expect(restored).toEqual(next);
   });
 
   test('drops matched and dead active boards while preserving other segments', () => {
