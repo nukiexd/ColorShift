@@ -3,6 +3,7 @@ import { act, renderHook, waitFor } from '@testing-library/react-native';
 import { PropsWithChildren } from 'react';
 import { AppProvider, useApp } from './AppProvider';
 import { createDefaultState } from '../storage/schema';
+import { createSession } from '../game/session';
 
 jest.mock('@react-native-async-storage/async-storage', () => ({ getItem: jest.fn(), setItem: jest.fn() }));
 const storage = AsyncStorage as jest.Mocked<typeof AsyncStorage>;
@@ -111,5 +112,79 @@ describe('AppProvider', () => {
     const lastSaved = JSON.parse(storage.setItem.mock.calls.at(-1)![1]);
     expect(lastSaved.profile.nickname).toBe('1234567890123456');
     expect(lastSaved.settings).toEqual({ effectsVolume: 0, haptics: false, reducedMotion: true });
+  });
+
+  test('linearizes settlement and finish in the same event-loop turn', async () => {
+    const wrapper = ({ children }: PropsWithChildren) => <AppProvider seedFactory={() => 7}>{children}</AppProvider>;
+    const { result } = await renderHook(() => useApp(), { wrapper });
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+    await act(() => { result.current.startGame(); });
+    const settled = { ...result.current.activeSession!, score: 4_000, bestCascade: 3, clearedTiles: 12 };
+    let outcome!: ReturnType<typeof result.current.finishGame>;
+    await act(() => {
+      expect(result.current.settleSession(settled)).toBe(true);
+      outcome = result.current.finishGame();
+    });
+    expect(outcome).toMatchObject({ result: { score: 4_000, bestCascade: 3, clearedTiles: 12 } });
+    expect(result.current.activeSession).toBeNull();
+    expect(result.current.profile.bestScore).toBe(4_000);
+  });
+
+  test('linearizes pause and continue in the same event-loop turn', async () => {
+    const wrapper = ({ children }: PropsWithChildren) => <AppProvider seedFactory={() => 7}>{children}</AppProvider>;
+    const { result } = await renderHook(() => useApp(), { wrapper });
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+    await act(() => { result.current.startGame(); });
+    let continued!: ReturnType<typeof result.current.continueGame>;
+    await act(() => {
+      result.current.pauseGame();
+      continued = result.current.continueGame();
+    });
+    expect(continued?.phase).toBe('idle');
+    expect(result.current.activeSession?.phase).toBe('idle');
+  });
+
+  test('rejects a stale settlement after the session has been replaced', async () => {
+    const seedFactory = jest.fn().mockReturnValue(7);
+    const wrapper = ({ children }: PropsWithChildren) => <AppProvider seedFactory={seedFactory}>{children}</AppProvider>;
+    const { result } = await renderHook(() => useApp(), { wrapper });
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+    await act(() => { result.current.startGame(); });
+    const stale = result.current.activeSession!;
+    await act(() => { result.current.discardAndStart(); });
+    const replacement = result.current.activeSession!;
+    expect(replacement.sessionId).not.toBe(stale.sessionId);
+    await act(() => { expect(result.current.settleSession({ ...stale, score: 99_000 })).toBe(false); });
+    expect(result.current.activeSession).toBe(replacement);
+  });
+
+  test('blocks every mutation until hydration has completed', async () => {
+    let resolveLoad!: (value: string) => void;
+    storage.getItem.mockImplementationOnce(() => new Promise<string>((resolve) => { resolveLoad = resolve; }));
+    const seedFactory = jest.fn().mockReturnValue(7);
+    const wrapper = ({ children }: PropsWithChildren) => <AppProvider seedFactory={seedFactory}>{children}</AppProvider>;
+    const { result } = await renderHook(() => useApp(), { wrapper });
+    expect(result.current.hydrated).toBe(false);
+    const candidate = createSession(99);
+    await act(() => {
+      expect(result.current.startGame()).toBeNull();
+      expect(result.current.continueGame()).toBeNull();
+      expect(result.current.discardAndStart()).toBeNull();
+      expect(result.current.settleSession(candidate)).toBe(false);
+      expect(result.current.finishGame()).toBeNull();
+      expect(result.current.updateNickname('Лиса')).toBe(false);
+      result.current.updateSettings({ effectsVolume: 1, haptics: false });
+      result.current.pauseGame();
+      result.current.resumeGame();
+    });
+    expect(seedFactory).not.toHaveBeenCalled();
+    expect(result.current.activeSession).toBeNull();
+    expect(result.current.profile).toEqual(createDefaultState().profile);
+    expect(result.current.settings).toEqual(createDefaultState().settings);
+
+    const loaded = { ...createDefaultState(), profile: { ...createDefaultState().profile, nickname: 'Лиса' } };
+    await act(async () => { resolveLoad(JSON.stringify(loaded)); });
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+    expect(result.current.profile.nickname).toBe('Лиса');
   });
 });

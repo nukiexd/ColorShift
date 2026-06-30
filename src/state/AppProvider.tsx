@@ -1,4 +1,4 @@
-import { createContext, PropsWithChildren, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, PropsWithChildren, useCallback, useContext, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { applyXp, createSession, GameSession, xpForScore } from '../game/session';
 import { loadState, saveState } from '../storage/repository';
 import { clampVolume, createDefaultState, normalizeNickname, PersistedState, Profile, Settings } from '../storage/schema';
@@ -25,7 +25,7 @@ export interface AppContextValue {
   continueGame(): GameSession | null;
   settleSession(session: GameSession): boolean;
   finishGame(): FinishOutcome | null;
-  discardAndStart(): GameSession;
+  discardAndStart(): GameSession | null;
   updateNickname(nickname: string): boolean;
   updateSettings(settings: Partial<Settings>): void;
   pauseGame(): void;
@@ -42,100 +42,123 @@ export function AppProvider({ children, seedFactory }: AppProviderProps) {
   const [state, setState] = useState<PersistedState>(createDefaultState);
   const stateRef = useRef(state);
   const [hydrated, setHydrated] = useState(false);
+  const hydratedRef = useRef(false);
   const nextSeed = useRef(1);
+  const providerToken = useId();
+  const nextSessionIdentity = useRef(1);
+  const commitState = useCallback((next: PersistedState) => {
+    stateRef.current = next;
+    setState(next);
+  }, []);
 
   useEffect(() => {
     let mounted = true;
     void loadState().then((loaded) => {
       if (!mounted) return;
-      stateRef.current = loaded;
-      setState(loaded);
+      commitState(loaded);
+      hydratedRef.current = true;
       setHydrated(true);
     });
     return () => { mounted = false; };
-  }, []);
+  }, [commitState]);
 
   useEffect(() => {
     if (hydrated) void saveState(state);
   }, [hydrated, state]);
 
-  useEffect(() => {
-    stateRef.current = state;
-  }, [state]);
-
-  const makeSession = useCallback(() => createSession(seedFactory ? seedFactory() : nextSeed.current++), [seedFactory]);
+  const makeSession = useCallback(() => {
+    const session = createSession(seedFactory ? seedFactory() : nextSeed.current++);
+    const sessionId = `${session.sessionId}-${providerToken}-${nextSessionIdentity.current}`;
+    nextSessionIdentity.current += 1;
+    return { ...session, sessionId };
+  }, [providerToken, seedFactory]);
 
   const startGame = useCallback(() => {
+    if (!hydratedRef.current) return null;
     if (stateRef.current.activeSession) return stateRef.current.activeSession;
     const session = makeSession();
     const next = { ...stateRef.current, activeSession: session };
-    stateRef.current = next;
-    setState(next);
+    commitState(next);
     return session;
-  }, [makeSession]);
+  }, [commitState, makeSession]);
 
   const discardAndStart = useCallback(() => {
+    if (!hydratedRef.current) return null;
     const session = makeSession();
     const next = { ...stateRef.current, activeSession: session };
-    stateRef.current = next;
-    setState(next);
+    commitState(next);
     return session;
-  }, [makeSession]);
+  }, [commitState, makeSession]);
 
   const continueGame = useCallback(() => {
-    const session = state.activeSession;
+    if (!hydratedRef.current) return null;
+    const session = stateRef.current.activeSession;
     if (!session) return null;
-    if (session.phase === 'paused') setState((current) => current.activeSession ? { ...current, activeSession: { ...current.activeSession, phase: 'idle' } } : current);
-    return session.phase === 'paused' ? { ...session, phase: 'idle' as const } : session;
-  }, [state.activeSession]);
+    if (session.phase !== 'paused') return session;
+    const resumed = { ...session, phase: 'idle' as const };
+    commitState({ ...stateRef.current, activeSession: resumed });
+    return resumed;
+  }, [commitState]);
 
   const settleSession = useCallback((session: GameSession) => {
+    if (!hydratedRef.current) return false;
     if (session.phase !== 'idle' && session.phase !== 'paused') return false;
-    setState((current) => ({ ...current, activeSession: session }));
+    if (stateRef.current.activeSession?.sessionId !== session.sessionId) return false;
+    commitState({ ...stateRef.current, activeSession: session });
     return true;
-  }, []);
+  }, [commitState]);
 
   const finishGame = useCallback((): FinishOutcome | null => {
-    const session = state.activeSession;
+    if (!hydratedRef.current) return null;
+    const current = stateRef.current;
+    const session = current.activeSession;
     if (!session || (session.phase !== 'idle' && session.phase !== 'paused')) return null;
     const xpEarned = xpForScore(session.score);
     const result: GameResult = {
       score: session.score,
       bestCascade: session.bestCascade,
       clearedTiles: session.clearedTiles,
-      isNewBest: session.score > state.profile.bestScore,
+      isNewBest: session.score > current.profile.bestScore,
     };
-    const progress = applyXp(state.profile, xpEarned);
-    setState((current) => ({
+    const progress = applyXp(current.profile, xpEarned);
+    commitState({
       ...current,
       profile: { ...current.profile, ...progress, bestScore: Math.max(current.profile.bestScore, session.score) },
       activeSession: null,
-    }));
+    });
     return { xpEarned, result };
-  }, [state.activeSession, state.profile]);
+  }, [commitState]);
 
   const updateNickname = useCallback((nickname: string) => {
+    if (!hydratedRef.current) return false;
     const normalized = normalizeNickname(nickname);
     if (!normalized) return false;
-    setState((current) => ({ ...current, profile: { ...current.profile, nickname: normalized } }));
+    const current = stateRef.current;
+    commitState({ ...current, profile: { ...current.profile, nickname: normalized } });
     return true;
-  }, []);
+  }, [commitState]);
 
   const updateSettings = useCallback((updates: Partial<Settings>) => {
-    setState((current) => ({
+    if (!hydratedRef.current) return;
+    const current = stateRef.current;
+    commitState({
       ...current,
       settings: {
         effectsVolume: updates.effectsVolume === undefined ? current.settings.effectsVolume : clampVolume(updates.effectsVolume),
         haptics: typeof updates.haptics === 'boolean' ? updates.haptics : current.settings.haptics,
         reducedMotion: typeof updates.reducedMotion === 'boolean' ? updates.reducedMotion : current.settings.reducedMotion,
       },
-    }));
-  }, []);
+    });
+  }, [commitState]);
 
-  const pauseGame = useCallback(() => setState((current) => current.activeSession?.phase === 'idle'
-    ? { ...current, activeSession: { ...current.activeSession, phase: 'paused' } } : current), []);
-  const resumeGame = useCallback(() => setState((current) => current.activeSession?.phase === 'paused'
-    ? { ...current, activeSession: { ...current.activeSession, phase: 'idle' } } : current), []);
+  const pauseGame = useCallback(() => {
+    if (!hydratedRef.current || stateRef.current.activeSession?.phase !== 'idle') return;
+    commitState({ ...stateRef.current, activeSession: { ...stateRef.current.activeSession, phase: 'paused' } });
+  }, [commitState]);
+  const resumeGame = useCallback(() => {
+    if (!hydratedRef.current || stateRef.current.activeSession?.phase !== 'paused') return;
+    commitState({ ...stateRef.current, activeSession: { ...stateRef.current.activeSession, phase: 'idle' } });
+  }, [commitState]);
 
   const value = useMemo<AppContextValue>(() => ({
     loading: !hydrated,

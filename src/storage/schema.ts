@@ -1,6 +1,8 @@
-import { BOARD_SIZE, TILE_COLORS } from '../game/balance';
+import { BOARD_SIZE, MAX_LEVEL, MAX_SCORE, MAX_TILE_ID_COUNTER, MAX_XP, TILE_COLORS } from '../game/balance';
 import { GameSession } from '../game/session';
 import { Special, TileColor } from '../game/model';
+import { findLegalMoves } from '../game/board';
+import { findMatches } from '../game/matches';
 
 export interface Profile {
   readonly nickname: string;
@@ -52,7 +54,8 @@ export function clampVolume(value: number): number {
 function parseProfile(value: unknown): Profile | null {
   if (!isRecord(value) || typeof value.nickname !== 'string') return null;
   const nickname = normalizeNickname(value.nickname);
-  if (!nickname || !isPositiveInteger(value.level) || !isNonnegativeInteger(value.xp) || !isNonnegativeInteger(value.bestScore)) return null;
+  if (!nickname || !isBoundedInteger(value.level, 1, MAX_LEVEL) || !isBoundedInteger(value.xp, 0, MAX_XP)
+    || !isBoundedInteger(value.bestScore, 0, MAX_SCORE)) return null;
   return { nickname, level: value.level, xp: value.xp, bestScore: value.bestScore };
 }
 
@@ -64,10 +67,14 @@ function parseSettings(value: unknown): Settings | null {
 
 function parseSession(value: unknown): GameSession | null {
   if (!isRecord(value) || (value.phase !== 'idle' && value.phase !== 'paused') || !isBoard(value.board)
-    || !isNonnegativeInteger(value.score) || !isNonnegativeInteger(value.bestCascade) || !isNonnegativeInteger(value.clearedTiles)
+    || typeof value.sessionId !== 'string' || value.sessionId.length === 0 || value.sessionId.length > 64
+    || !isBoundedInteger(value.score, 0, MAX_SCORE) || !isBoundedInteger(value.bestCascade, 0, MAX_SCORE)
+    || !isBoundedInteger(value.clearedTiles, 0, MAX_SCORE)
     || (value.backgroundColor !== null && !isTileColor(value.backgroundColor))
-    || !isUint32(value.randomState) || !isNonnegativeInteger(value.tileIdCounter)
-    || typeof value.tileIdNamespace !== 'string' || value.tileIdNamespace.length === 0) return null;
+    || !isUint32(value.randomState) || !isBoundedInteger(value.tileIdCounter, 0, MAX_TILE_ID_COUNTER - 1)
+    || typeof value.tileIdNamespace !== 'string' || value.tileIdNamespace.length === 0 || value.tileIdNamespace.length > 64
+    || findMatches(value.board as unknown as GameSession['board']).length > 0
+    || findLegalMoves(value.board as unknown as GameSession['board']).length === 0) return null;
   return value as unknown as GameSession;
 }
 
@@ -77,7 +84,7 @@ function isBoard(value: unknown): boolean {
   for (const row of value) {
     if (!Array.isArray(row) || row.length !== BOARD_SIZE) return false;
     for (const cell of row) {
-      if (!isRecord(cell) || typeof cell.id !== 'string' || cell.id.length === 0 || ids.has(cell.id)
+      if (!isRecord(cell) || typeof cell.id !== 'string' || cell.id.length === 0 || cell.id.length > 128 || ids.has(cell.id)
         || !isTileColor(cell.color) || !isSpecial(cell.special)) return false;
       ids.add(cell.id);
     }
@@ -101,8 +108,8 @@ function isNonnegativeInteger(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
 }
 
-function isPositiveInteger(value: unknown): value is number {
-  return isNonnegativeInteger(value) && value >= 1;
+function isBoundedInteger(value: unknown, minimum: number, maximum: number): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= minimum && value <= maximum;
 }
 
 function isUint32(value: unknown): value is number {

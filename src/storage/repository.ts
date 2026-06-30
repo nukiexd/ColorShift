@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createDefaultState, parsePersistedState, PersistedState } from './schema';
 
 export const STORAGE_KEY = 'color-shift/state/v1';
+let writeQueue: Promise<void> = Promise.resolve();
 
 export async function loadState(): Promise<PersistedState> {
   try {
@@ -13,12 +14,16 @@ export async function loadState(): Promise<PersistedState> {
   }
 }
 
-export async function saveState(state: unknown): Promise<boolean> {
-  try {
-    const safe = parsePersistedState(state);
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(safe));
-    return true;
-  } catch {
-    return false;
-  }
+export function saveState(state: unknown): Promise<boolean> {
+  const serialized = JSON.stringify(parsePersistedState(state));
+  const write = writeQueue.then(async () => {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEY, serialized);
+      return true;
+    } catch {
+      return false;
+    }
+  });
+  writeQueue = write.then(() => undefined, () => undefined);
+  return write;
 }
