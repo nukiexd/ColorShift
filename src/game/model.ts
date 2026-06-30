@@ -29,8 +29,17 @@ export interface RandomSource {
   next(): number;
 }
 
+export interface StatefulRandomSource extends RandomSource {
+  getState(): number;
+}
+
 export interface TileIdSource {
   next(): string;
+}
+
+export interface StatefulTileIdSource extends TileIdSource {
+  getCounter(): number;
+  readonly namespace: string;
 }
 
 export interface ClearPhase {

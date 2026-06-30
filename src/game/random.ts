@@ -1,6 +1,6 @@
-import { RandomSource, TileIdSource } from './model';
+import { StatefulRandomSource, StatefulTileIdSource } from './model';
 
-export function createSeededRandom(seed: number): RandomSource {
+export function createSeededRandom(seed: number): StatefulRandomSource {
   let state = seed >>> 0;
 
   return {
@@ -11,10 +11,11 @@ export function createSeededRandom(seed: number): RandomSource {
       value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
       return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
     },
+    getState: () => state,
   };
 }
 
-export function createTileIdSource(start = 0, namespace = 'refill'): TileIdSource {
+export function createTileIdSource(start = 0, namespace = 'refill'): StatefulTileIdSource {
   let counter = start;
-  return { next: () => `${namespace}-${counter++}` };
+  return { namespace, next: () => `${namespace}-${counter++}`, getCounter: () => counter };
 }
