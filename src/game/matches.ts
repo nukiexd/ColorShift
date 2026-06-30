@@ -1,6 +1,6 @@
 import { Board, Coord, MatchGroup } from './model';
 
-export function findMatches(board: Board): readonly MatchGroup[] {
+export function findMatches(board: Board): MatchGroup[] {
   const groups: MatchGroup[] = [];
 
   for (let row = 0; row < board.length; row += 1) {

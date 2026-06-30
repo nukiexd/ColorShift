@@ -1,6 +1,6 @@
 import { findLegalMoves, swapCells } from './board';
 import { findMatches } from './matches';
-import { Board, Tile, TileColor } from './model';
+import { Board, MatchGroup, Tile, TileColor } from './model';
 
 const colors: TileColor[][] = [
   ['coral', 'sky', 'mint', 'sun', 'plum', 'coral'],
@@ -60,6 +60,17 @@ test('findMatches ignores null cells and groups shorter than three', () => {
     [0, 3, 'coral'],
   ]);
   expect(findMatches(board)).toEqual([]);
+});
+
+test('findMatches exposes its result as a mutable group array', () => {
+  const matches: MatchGroup[] = findMatches(boardWith([]));
+  matches.push({
+    color: 'coral',
+    orientation: 'horizontal',
+    cells: [],
+  });
+
+  expect(matches).toHaveLength(1);
 });
 
 test('findLegalMoves only includes swaps whose new match contains a swapped coordinate', () => {
