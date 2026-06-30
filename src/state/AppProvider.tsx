@@ -40,6 +40,7 @@ const AppContext = createContext<AppContextValue | null>(null);
 
 export function AppProvider({ children, seedFactory }: AppProviderProps) {
   const [state, setState] = useState<PersistedState>(createDefaultState);
+  const stateRef = useRef(state);
   const [hydrated, setHydrated] = useState(false);
   const nextSeed = useRef(1);
 
@@ -47,6 +48,7 @@ export function AppProvider({ children, seedFactory }: AppProviderProps) {
     let mounted = true;
     void loadState().then((loaded) => {
       if (!mounted) return;
+      stateRef.current = loaded;
       setState(loaded);
       setHydrated(true);
     });
@@ -57,18 +59,26 @@ export function AppProvider({ children, seedFactory }: AppProviderProps) {
     if (hydrated) void saveState(state);
   }, [hydrated, state]);
 
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
+
   const makeSession = useCallback(() => createSession(seedFactory ? seedFactory() : nextSeed.current++), [seedFactory]);
 
   const startGame = useCallback(() => {
-    if (state.activeSession) return state.activeSession;
+    if (stateRef.current.activeSession) return stateRef.current.activeSession;
     const session = makeSession();
-    setState((current) => ({ ...current, activeSession: current.activeSession ?? session }));
+    const next = { ...stateRef.current, activeSession: session };
+    stateRef.current = next;
+    setState(next);
     return session;
-  }, [makeSession, state.activeSession]);
+  }, [makeSession]);
 
   const discardAndStart = useCallback(() => {
     const session = makeSession();
-    setState((current) => ({ ...current, activeSession: session }));
+    const next = { ...stateRef.current, activeSession: session };
+    stateRef.current = next;
+    setState(next);
     return session;
   }, [makeSession]);
 

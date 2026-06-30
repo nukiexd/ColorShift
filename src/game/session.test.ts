@@ -44,6 +44,27 @@ describe('game session', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
+  test('tracks an exact known multi-cascade and never lowers an existing best', () => {
+    const session = createSession(0);
+    const next = commitMove(session, { row: 0, col: 3 }, { row: 1, col: 3 });
+    expect(next.bestCascade).toBe(2);
+    const previousRecord = { ...session, bestCascade: 5 };
+    expect(commitMove(previousRecord, { row: 0, col: 3 }, { row: 1, col: 3 }).bestCascade).toBe(5);
+  });
+
+  test('restored allocator advances beyond all historical IDs', () => {
+    const session = createSession(29);
+    const [from, to] = findLegalMoves(session.board)[0];
+    const afterMove = commitMove(session, from, to);
+    const historicalIds = new Set([...session.board.flat(), ...afterMove.board.flat()].map((tile) => tile?.id));
+    const restored = JSON.parse(JSON.stringify(afterMove));
+    const [nextFrom, nextTo] = findLegalMoves(restored.board)[0];
+    const resumed = commitMove(restored, nextFrom, nextTo);
+    expect(resumed.tileIdCounter).toBeGreaterThan(afterMove.tileIdCounter);
+    const newIds = resumed.board.flat().map((tile) => tile?.id).filter((id) => !afterMove.board.flat().some((tile) => tile?.id === id));
+    expect(newIds.every((id) => !historicalIds.has(id))).toBe(true);
+  });
+
   test('calculates XP and carries it across multiple levels', () => {
     expect(xpForScore(0)).toBe(0);
     expect(xpForScore(1000)).toBe(10);

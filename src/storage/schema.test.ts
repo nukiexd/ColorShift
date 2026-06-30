@@ -21,6 +21,20 @@ describe('persisted state schema', () => {
     expect(parsed.activeSession).toBeNull();
   });
 
+  test('preserves valid non-default profile and settings when only the active session is corrupt', () => {
+    const profile = { nickname: '  Лиса  ', level: 4, xp: 72, bestScore: 45000 };
+    const settings = { effectsVolume: 0.8, haptics: false, reducedMotion: true };
+    const parsed = parsePersistedState({
+      version: 1,
+      profile,
+      settings,
+      activeSession: { ...createSession(12), board: [] },
+    });
+    expect(parsed.profile).toEqual({ ...profile, nickname: 'Лиса' });
+    expect(parsed.settings).toEqual(settings);
+    expect(parsed.activeSession).toBeNull();
+  });
+
   test('rejects duplicate tile ids and unstable persisted phases', () => {
     const session = createSession(5);
     const board = session.board.map((row) => row.map((tile) => ({ ...tile! })));
