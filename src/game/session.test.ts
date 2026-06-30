@@ -1,6 +1,14 @@
 import { findLegalMoves } from './board';
 import { commitMove, createSession, applyXp, xpForScore, xpRequiredForLevel } from './session';
-import { MAX_LEVEL, MAX_SCORE, MAX_SESSION_REVISION, MAX_TILE_ID_COUNTER, MAX_XP } from './balance';
+import {
+  MAX_CASCADES,
+  MAX_LEVEL,
+  MAX_SCORE,
+  MAX_SESSION_EPOCH,
+  MAX_SESSION_REVISION,
+  MAX_TILE_ID_COUNTER,
+  MAX_XP,
+} from './balance';
 import { createTileIdSource } from './random';
 
 describe('game session', () => {
@@ -10,6 +18,7 @@ describe('game session', () => {
     expect(first).toEqual(second);
     expect(first.phase).toBe('idle');
     expect(first.sessionRevision).toBe(0);
+    expect(first.sessionEpoch).toBe(0);
     expect(findLegalMoves(first.board).length).toBeGreaterThan(0);
   });
 
@@ -33,6 +42,7 @@ describe('game session', () => {
     expect(next.randomState).not.toBe(session.randomState);
     expect(next.tileIdCounter).toBeGreaterThan(session.tileIdCounter);
     expect(next.sessionRevision).toBe(session.sessionRevision + 1);
+    expect(next.sessionEpoch).toBe(session.sessionEpoch);
     expect(next.phase).toBe('idle');
   });
 
@@ -100,6 +110,13 @@ describe('game session', () => {
     const session = { ...createSession(2), sessionRevision: MAX_SESSION_REVISION };
     const [from, to] = findLegalMoves(session.board)[0];
     expect(commitMove(session, from, to)).toBe(session);
+  });
+
+  test('bounds the causal epoch and runtime cascade statistic', () => {
+    expect(MAX_SESSION_EPOCH).toBeDefined();
+    const session = { ...createSession(2), bestCascade: MAX_CASCADES + 1 };
+    const [from, to] = findLegalMoves(session.board)[0];
+    expect(commitMove(session, from, to).bestCascade).toBe(MAX_CASCADES);
   });
 
   test('bounds malformed and oversized progression inputs in constant time', () => {

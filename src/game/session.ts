@@ -3,8 +3,10 @@ import { Board, Coord, TileColor } from './model';
 import { createSeededRandom, createTileIdSource } from './random';
 import { resolveMove } from './resolve';
 import {
+  MAX_CASCADES,
   MAX_LEVEL,
   MAX_SCORE,
+  MAX_SESSION_EPOCH,
   MAX_SESSION_REVISION,
   MAX_TILE_ID_COUNTER,
   MAX_TILE_ID_GENERATION,
@@ -16,6 +18,7 @@ export type SessionPhase = 'idle' | 'preview' | 'swapping' | 'clearing' | 'falli
 
 export interface GameSession {
   readonly sessionId: string;
+  readonly sessionEpoch: number;
   readonly sessionRevision: number;
   readonly board: Board;
   readonly score: number;
@@ -43,6 +46,7 @@ export function createSession(seed = 0, sessionId = `session-${seed >>> 0}`): Ga
   const board = createBoard(random);
   return {
     sessionId,
+    sessionEpoch: 0,
     sessionRevision: 0,
     board,
     score: 0,
@@ -80,7 +84,7 @@ export function commitMove(session: GameSession, from: Coord, to: Coord): GameSe
     sessionRevision: session.sessionRevision + 1,
     board: resolution.board,
     score: boundedSum(session.score, resolution.scoreDelta),
-    bestCascade: Math.min(MAX_SCORE, Math.max(session.bestCascade, ...resolution.phases.map((phase) => phase.cascade))),
+    bestCascade: Math.min(MAX_CASCADES, Math.max(session.bestCascade, ...resolution.phases.map((phase) => phase.cascade))),
     clearedTiles: boundedSum(session.clearedTiles,
       resolution.phases.reduce((sum, phase) => sum + new Set(phase.cleared.map(({ row, col }) => `${row},${col}`)).size, 0)),
     backgroundColor: lastPhase?.backgroundColor ?? session.backgroundColor,
@@ -90,6 +94,38 @@ export function commitMove(session: GameSession, from: Coord, to: Coord): GameSe
     tileIdGeneration,
     tileIdNamespace,
   };
+}
+
+export function areGameSessionsEqual(first: GameSession, second: GameSession): boolean {
+  return first.sessionId === second.sessionId
+    && first.sessionEpoch === second.sessionEpoch
+    && first.sessionRevision === second.sessionRevision
+    && first.score === second.score
+    && first.bestCascade === second.bestCascade
+    && first.clearedTiles === second.clearedTiles
+    && first.backgroundColor === second.backgroundColor
+    && first.phase === second.phase
+    && first.randomState === second.randomState
+    && first.tileIdCounter === second.tileIdCounter
+    && first.tileIdGeneration === second.tileIdGeneration
+    && first.tileIdNamespace === second.tileIdNamespace
+    && boardsEqual(first.board, second.board);
+}
+
+function boardsEqual(first: Board, second: Board): boolean {
+  return first.length === second.length && first.every((row, rowIndex) => {
+    const otherRow = second[rowIndex];
+    return row.length === otherRow?.length && row.every((tile, colIndex) => {
+      const other = otherRow[colIndex];
+      return tile === null ? other === null : other !== null && other !== undefined
+        && tile.id === other.id && tile.color === other.color && tile.special === other.special;
+    });
+  });
+}
+
+export function advanceSessionEpoch(session: GameSession, phase: 'idle' | 'paused'): GameSession {
+  if (session.sessionEpoch >= MAX_SESSION_EPOCH) return session;
+  return { ...session, phase, sessionEpoch: session.sessionEpoch + 1 };
 }
 
 export function xpForScore(score: number): number {

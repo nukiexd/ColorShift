@@ -1,5 +1,6 @@
 import { createContext, PropsWithChildren, useCallback, useContext, useEffect, useId, useMemo, useRef, useState } from 'react';
-import { applyXp, createSession, GameSession, xpForScore } from '../game/session';
+import { advanceSessionEpoch, applyXp, areGameSessionsEqual, commitMove, createSession, GameSession, xpForScore } from '../game/session';
+import { Coord } from '../game/model';
 import { loadState, saveState } from '../storage/repository';
 import {
   clampVolume,
@@ -31,7 +32,7 @@ export interface AppContextValue {
   readonly activeSession: GameSession | null;
   startGame(): GameSession | null;
   continueGame(): GameSession | null;
-  settleSession(session: GameSession): boolean;
+  settleSession(session: GameSession, from: Coord, to: Coord): boolean;
   finishGame(): FinishOutcome | null;
   discardAndStart(): GameSession | null;
   updateNickname(nickname: string): boolean;
@@ -103,12 +104,13 @@ export function AppProvider({ children, seedFactory }: AppProviderProps) {
     const session = stateRef.current.activeSession;
     if (!session) return null;
     if (session.phase !== 'paused') return session;
-    const resumed = { ...session, phase: 'idle' as const };
+    const resumed = advanceSessionEpoch(session, 'idle');
+    if (resumed === session) return session;
     commitState({ ...stateRef.current, activeSession: resumed });
     return resumed;
   }, [commitState]);
 
-  const settleSession = useCallback((session: GameSession) => {
+  const settleSession = useCallback((session: GameSession, from: Coord, to: Coord) => {
     if (!hydratedRef.current) return false;
     let safeSession: GameSession | null;
     try {
@@ -117,9 +119,10 @@ export function AppProvider({ children, seedFactory }: AppProviderProps) {
       return false;
     }
     const currentSession = stateRef.current.activeSession;
-    if (!safeSession || currentSession?.sessionId !== safeSession.sessionId
-      || safeSession.sessionRevision !== currentSession.sessionRevision + 1) return false;
-    commitState({ ...stateRef.current, activeSession: safeSession });
+    if (!safeSession || currentSession?.phase !== 'idle') return false;
+    const expected = commitMove(currentSession, from, to);
+    if (expected === currentSession || !areGameSessionsEqual(safeSession, expected)) return false;
+    commitState({ ...stateRef.current, activeSession: expected });
     return true;
   }, [commitState]);
 
@@ -168,11 +171,13 @@ export function AppProvider({ children, seedFactory }: AppProviderProps) {
 
   const pauseGame = useCallback(() => {
     if (!hydratedRef.current || stateRef.current.activeSession?.phase !== 'idle') return;
-    commitState({ ...stateRef.current, activeSession: { ...stateRef.current.activeSession, phase: 'paused' } });
+    const paused = advanceSessionEpoch(stateRef.current.activeSession, 'paused');
+    if (paused !== stateRef.current.activeSession) commitState({ ...stateRef.current, activeSession: paused });
   }, [commitState]);
   const resumeGame = useCallback(() => {
     if (!hydratedRef.current || stateRef.current.activeSession?.phase !== 'paused') return;
-    commitState({ ...stateRef.current, activeSession: { ...stateRef.current.activeSession, phase: 'idle' } });
+    const resumed = advanceSessionEpoch(stateRef.current.activeSession, 'idle');
+    if (resumed !== stateRef.current.activeSession) commitState({ ...stateRef.current, activeSession: resumed });
   }, [commitState]);
 
   const value = useMemo<AppContextValue>(() => ({

@@ -3,8 +3,8 @@ import { act, renderHook, waitFor } from '@testing-library/react-native';
 import { PropsWithChildren } from 'react';
 import { AppProvider, useApp } from './AppProvider';
 import { createDefaultState } from '../storage/schema';
-import { commitMove, createSession } from '../game/session';
-import { MAX_SCORE, MAX_TILE_ID_COUNTER } from '../game/balance';
+import { commitMove, createSession, tileIdNamespaceFor, xpForScore } from '../game/session';
+import { MAX_SCORE, MAX_SESSION_EPOCH, MAX_TILE_ID_COUNTER } from '../game/balance';
 import { findLegalMoves } from '../game/board';
 
 jest.mock('@react-native-async-storage/async-storage', () => ({ getItem: jest.fn(), setItem: jest.fn() }));
@@ -33,15 +33,26 @@ describe('AppProvider', () => {
 
     const [from, to] = findLegalMoves(original!.board)[0];
     const advanced = commitMove(original!, from, to);
-    await act(() => { result.current.settleSession({ ...advanced, score: 1000, bestCascade: 2, clearedTiles: 9 }); });
+    await act(() => { expect(result.current.settleSession(advanced, from, to)).toBe(true); });
     let finish!: ReturnType<typeof result.current.finishGame>;
     await act(() => { finish = result.current.finishGame(); });
-    expect(finish).toMatchObject({ xpEarned: 10, result: { score: 1000, bestCascade: 2, clearedTiles: 9, isNewBest: true } });
+    expect(finish).toMatchObject({
+      xpEarned: xpForScore(advanced.score),
+      result: {
+        score: advanced.score,
+        bestCascade: advanced.bestCascade,
+        clearedTiles: advanced.clearedTiles,
+        isNewBest: true,
+      },
+    });
     expect(result.current.activeSession).toBeNull();
-    expect(result.current.profile).toMatchObject({ xp: 10, bestScore: 1000 });
+    expect(result.current.profile).toMatchObject({ xp: xpForScore(advanced.score), bestScore: advanced.score });
     await waitFor(() => {
       const saved = JSON.parse(storage.setItem.mock.calls.at(-1)![1]);
-      expect(saved).toMatchObject({ profile: { xp: 10, bestScore: 1000 }, activeSession: null });
+      expect(saved).toMatchObject({
+        profile: { xp: xpForScore(advanced.score), bestScore: advanced.score },
+        activeSession: null,
+      });
     });
   });
 
@@ -87,7 +98,10 @@ describe('AppProvider', () => {
     await act(() => { result.current.resumeGame(); });
     expect(result.current.activeSession?.phase).toBe('idle');
     await expectPersistedPhase('idle');
-    await act(() => { expect(result.current.settleSession({ ...first, phase: 'clearing' })).toBe(false); });
+    const [firstFrom, firstTo] = findLegalMoves(first.board)[0];
+    await act(() => {
+      expect(result.current.settleSession({ ...first, phase: 'clearing' }, firstFrom, firstTo)).toBe(false);
+    });
     expect(result.current.activeSession?.phase).toBe('idle');
     let replacement;
     await act(() => { replacement = result.current.discardAndStart(); });
@@ -126,15 +140,21 @@ describe('AppProvider', () => {
     await act(() => { result.current.startGame(); });
     const current = result.current.activeSession!;
     const [from, to] = findLegalMoves(current.board)[0];
-    const settled = { ...commitMove(current, from, to), score: 4_000, bestCascade: 3, clearedTiles: 12 };
+    const settled = commitMove(current, from, to);
     let outcome!: ReturnType<typeof result.current.finishGame>;
     await act(() => {
-      expect(result.current.settleSession(settled)).toBe(true);
+      expect(result.current.settleSession(settled, from, to)).toBe(true);
       outcome = result.current.finishGame();
     });
-    expect(outcome).toMatchObject({ result: { score: 4_000, bestCascade: 3, clearedTiles: 12 } });
+    expect(outcome).toMatchObject({
+      result: {
+        score: settled.score,
+        bestCascade: settled.bestCascade,
+        clearedTiles: settled.clearedTiles,
+      },
+    });
     expect(result.current.activeSession).toBeNull();
-    expect(result.current.profile.bestScore).toBe(4_000);
+    expect(result.current.profile.bestScore).toBe(settled.score);
   });
 
   test('linearizes pause and continue in the same event-loop turn', async () => {
@@ -161,7 +181,9 @@ describe('AppProvider', () => {
     await act(() => { result.current.discardAndStart(); });
     const replacement = result.current.activeSession!;
     expect(replacement.sessionId).not.toBe(stale.sessionId);
-    await act(() => { expect(result.current.settleSession({ ...stale, score: 99_000 })).toBe(false); });
+    const [from, to] = findLegalMoves(stale.board)[0];
+    const staleResult = commitMove(stale, from, to);
+    await act(() => { expect(result.current.settleSession(staleResult, from, to)).toBe(false); });
     expect(result.current.activeSession).toBe(replacement);
   });
 
@@ -172,6 +194,8 @@ describe('AppProvider', () => {
     await act(() => { result.current.startGame(); });
     const original = result.current.activeSession!;
     await act(() => { expect(result.current.updateNickname('Лиса')).toBe(true); });
+    const [from, to] = findLegalMoves(original.board)[0];
+    const exact = commitMove(original, from, to);
     const matchedBoard = original.board.map((row) => row.map((tile) => ({ ...tile! })));
     matchedBoard[0][0].color = 'coral';
     matchedBoard[0][1].color = 'coral';
@@ -183,21 +207,90 @@ describe('AppProvider', () => {
       { ...original, tileIdNamespace: `${original.tileIdNamespace}-wrong` },
     ];
     for (const candidate of candidates) {
-      await act(() => { expect(result.current.settleSession(candidate)).toBe(false); });
+      await act(() => { expect(result.current.settleSession(candidate, from, to)).toBe(false); });
       expect(result.current.activeSession).toBe(original);
     }
     const hostile = { ...original };
     Object.defineProperty(hostile, 'score', { get: () => { throw new Error('hostile'); } });
-    await act(() => { expect(result.current.settleSession(hostile)).toBe(false); });
+    await act(() => { expect(result.current.settleSession(hostile, from, to)).toBe(false); });
     expect(result.current.activeSession).toBe(original);
-    const [from, to] = findLegalMoves(original.board)[0];
-    await act(() => { expect(result.current.settleSession({ ...commitMove(original, from, to), score: 1_000 })).toBe(true); });
+    await act(() => { expect(result.current.settleSession(exact, from, to)).toBe(true); });
     await act(() => { result.current.finishGame(); });
-    expect(result.current.profile).toMatchObject({ nickname: 'Лиса', bestScore: 1_000 });
+    expect(result.current.profile).toMatchObject({ nickname: 'Лиса', bestScore: exact.score });
     await waitFor(() => {
       const saved = JSON.parse(storage.setItem.mock.calls.at(-1)![1]);
-      expect(saved.profile).toMatchObject({ nickname: 'Лиса', bestScore: 1_000 });
+      expect(saved.profile).toMatchObject({ nickname: 'Лиса', bestScore: exact.score });
     });
+  });
+
+  test('accepts only the exact deterministic transition for supplied coordinates', async () => {
+    const wrapper = ({ children }: PropsWithChildren) => <AppProvider seedFactory={() => 0}>{children}</AppProvider>;
+    const { result } = await renderHook(() => useApp(), { wrapper });
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+    await act(() => { result.current.startGame(); });
+    const base = result.current.activeSession!;
+    const moves = findLegalMoves(base.board);
+    const [from, to] = moves[0];
+    const exact = commitMove(base, from, to);
+    const [otherFrom, otherTo] = moves[1];
+    const sibling = commitMove(base, otherFrom, otherTo);
+    const forgedGeneration = exact.tileIdGeneration + 1;
+    const forgedSessionId = `${exact.sessionId}-forged`;
+    const forgeries = [
+      { ...exact, score: exact.score + 100 },
+      { ...exact, bestCascade: exact.bestCascade + 1 },
+      { ...exact, clearedTiles: exact.clearedTiles + 1 },
+      { ...exact, board: sibling.board },
+      { ...exact, randomState: (exact.randomState + 1) >>> 0 },
+      { ...exact, tileIdCounter: exact.tileIdCounter + 1 },
+      {
+        ...exact,
+        tileIdGeneration: forgedGeneration,
+        tileIdCounter: 0,
+        tileIdNamespace: tileIdNamespaceFor(exact.sessionId, forgedGeneration),
+      },
+      {
+        ...exact,
+        sessionId: forgedSessionId,
+        tileIdNamespace: tileIdNamespaceFor(forgedSessionId, exact.tileIdGeneration),
+      },
+      { ...exact, phase: 'paused' as const },
+    ];
+    for (const forged of forgeries) {
+      await act(() => { expect(result.current.settleSession(forged, from, to)).toBe(false); });
+      expect(result.current.activeSession).toEqual(base);
+    }
+    await act(() => { expect(result.current.settleSession(exact, from, to)).toBe(true); });
+    expect(result.current.activeSession).toEqual(exact);
+  });
+
+  test('invalidates settlements computed before pause even after resume', async () => {
+    const wrapper = ({ children }: PropsWithChildren) => <AppProvider seedFactory={() => 7}>{children}</AppProvider>;
+    const { result } = await renderHook(() => useApp(), { wrapper });
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+    await act(() => { result.current.startGame(); });
+    const base = result.current.activeSession!;
+    const [from, to] = findLegalMoves(base.board)[0];
+    const late = commitMove(base, from, to);
+    await act(() => { result.current.pauseGame(); });
+    await act(() => { expect(result.current.settleSession(late, from, to)).toBe(false); });
+    await act(() => { result.current.resumeGame(); });
+    await act(() => { expect(result.current.settleSession(late, from, to)).toBe(false); });
+    const resumed = result.current.activeSession!;
+    const [resumedFrom, resumedTo] = findLegalMoves(resumed.board)[0];
+    const current = commitMove(resumed, resumedFrom, resumedTo);
+    await act(() => { expect(result.current.settleSession(current, resumedFrom, resumedTo)).toBe(true); });
+  });
+
+  test('does not overflow the causal epoch at its terminal bound', async () => {
+    expect(MAX_SESSION_EPOCH).toBeDefined();
+    const terminal = { ...createSession(2), sessionEpoch: MAX_SESSION_EPOCH };
+    storage.getItem.mockResolvedValueOnce(JSON.stringify({ ...createDefaultState(), activeSession: terminal }));
+    const wrapper = ({ children }: PropsWithChildren) => <AppProvider>{children}</AppProvider>;
+    const { result } = await renderHook(() => useApp(), { wrapper });
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+    await act(() => { result.current.pauseGame(); });
+    expect(result.current.activeSession).toMatchObject({ phase: 'idle', sessionEpoch: MAX_SESSION_EPOCH });
   });
 
   test('accepts only the first of two competing sibling settlements', async () => {
@@ -206,20 +299,22 @@ describe('AppProvider', () => {
     await waitFor(() => expect(result.current.hydrated).toBe(true));
     await act(() => { result.current.startGame(); });
     const base = result.current.activeSession!;
-    const siblings = findLegalMoves(base.board).map(([from, to]) => commitMove(base, from, to));
-    const lower = siblings.find((candidate) => siblings.some((other) => other.tileIdCounter > candidate.tileIdCounter));
-    const higher = lower && siblings.find((candidate) => candidate.tileIdCounter > lower.tileIdCounter);
+    const siblings = findLegalMoves(base.board).map(([from, to]) => ({ from, to, session: commitMove(base, from, to) }));
+    const lower = siblings.find((candidate) => siblings.some((other) =>
+      other.session.tileIdCounter > candidate.session.tileIdCounter));
+    const higher = lower && siblings.find((candidate) =>
+      candidate.session.tileIdCounter > lower.session.tileIdCounter);
     expect(lower).toBeDefined();
     expect(higher).toBeDefined();
     let lowerAccepted!: boolean;
     let higherAccepted!: boolean;
     await act(() => {
-      lowerAccepted = result.current.settleSession(lower!);
-      higherAccepted = result.current.settleSession(higher!);
+      lowerAccepted = result.current.settleSession(lower!.session, lower!.from, lower!.to);
+      higherAccepted = result.current.settleSession(higher!.session, higher!.from, higher!.to);
     });
     expect(lowerAccepted).toBe(true);
     expect(higherAccepted).toBe(false);
-    expect(result.current.activeSession).toEqual(lower);
+    expect(result.current.activeSession).toEqual(lower!.session);
   });
 
   test('requires sequential revisions to be delivered without gaps', async () => {
@@ -232,10 +327,10 @@ describe('AppProvider', () => {
     const revisionOne = commitMove(base, firstFrom, firstTo);
     const [secondFrom, secondTo] = findLegalMoves(revisionOne.board)[0];
     const revisionTwo = commitMove(revisionOne, secondFrom, secondTo);
-    await act(() => { expect(result.current.settleSession(revisionTwo)).toBe(false); });
+    await act(() => { expect(result.current.settleSession(revisionTwo, secondFrom, secondTo)).toBe(false); });
     expect(result.current.activeSession).toEqual(base);
-    await act(() => { expect(result.current.settleSession(revisionOne)).toBe(true); });
-    await act(() => { expect(result.current.settleSession(revisionTwo)).toBe(true); });
+    await act(() => { expect(result.current.settleSession(revisionOne, firstFrom, firstTo)).toBe(true); });
+    await act(() => { expect(result.current.settleSession(revisionTwo, secondFrom, secondTo)).toBe(true); });
     expect(result.current.activeSession).toEqual(revisionTwo);
   });
 
@@ -247,8 +342,8 @@ describe('AppProvider', () => {
     await waitFor(() => expect(result.current.hydrated).toBe(true));
     const [from, to] = findLegalMoves(base.board)[0];
     const rolled = commitMove(base, from, to);
-    await act(() => { expect(result.current.settleSession(rolled)).toBe(true); });
-    await act(() => { expect(result.current.settleSession(base)).toBe(false); });
+    await act(() => { expect(result.current.settleSession(rolled, from, to)).toBe(true); });
+    await act(() => { expect(result.current.settleSession(base, from, to)).toBe(false); });
     expect(result.current.activeSession).toEqual(rolled);
   });
 
@@ -260,17 +355,22 @@ describe('AppProvider', () => {
     const original = result.current.activeSession!;
     const [from, to] = findLegalMoves(original.board)[0];
     const newer = commitMove(original, from, to);
-    await act(() => { expect(result.current.settleSession(newer)).toBe(true); });
+    await act(() => { expect(result.current.settleSession(newer, from, to)).toBe(true); });
     expect(result.current.activeSession).toEqual(newer);
 
     const equalModified = { ...newer, score: newer.score + 100 };
     const equalModifiedBoard = { ...newer, board: original.board };
-    const { tileIdGeneration: _generation, sessionRevision: _revision, ...legacyReset } = {
+    const {
+      tileIdGeneration: _generation,
+      sessionEpoch: _epoch,
+      sessionRevision: _revision,
+      ...legacyReset
+    } = {
       ...newer,
       tileIdNamespace: 'session-7',
     };
     for (const stale of [original, equalModified, equalModifiedBoard, legacyReset]) {
-      await act(() => { expect(result.current.settleSession(stale as typeof newer)).toBe(false); });
+      await act(() => { expect(result.current.settleSession(stale as typeof newer, from, to)).toBe(false); });
       expect(result.current.activeSession).toEqual(newer);
     }
     expect(result.current.activeSession).toMatchObject({
@@ -302,7 +402,7 @@ describe('AppProvider', () => {
       expect(result.current.startGame()).toBeNull();
       expect(result.current.continueGame()).toBeNull();
       expect(result.current.discardAndStart()).toBeNull();
-      expect(result.current.settleSession(candidate)).toBe(false);
+      expect(result.current.settleSession(candidate, { row: 0, col: 0 }, { row: 0, col: 1 })).toBe(false);
       expect(result.current.finishGame()).toBeNull();
       expect(result.current.updateNickname('Лиса')).toBe(false);
       result.current.updateSettings({ effectsVolume: 1, haptics: false });

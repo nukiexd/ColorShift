@@ -2,7 +2,9 @@ import { commitMove, createSession, xpForScore } from '../game/session';
 import { createDefaultState, parsePersistedState } from './schema';
 import {
   MAX_LEVEL,
+  MAX_CASCADES,
   MAX_SCORE,
+  MAX_SESSION_EPOCH,
   MAX_SESSION_REVISION,
   MAX_TILE_ID_COUNTER,
   MAX_TILE_IDS_PER_MOVE,
@@ -77,13 +79,49 @@ describe('persisted state schema', () => {
   });
 
   test('migrates missing v1 revisions and rejects oversized modern revisions', () => {
-    const { sessionRevision: _revision, ...legacy } = createSession(2);
+    const { sessionEpoch: _epoch, sessionRevision: _revision, ...legacy } = createSession(2);
     const migrated = parsePersistedState({ ...createDefaultState(), activeSession: legacy }).activeSession;
     expect(migrated).toMatchObject({ sessionRevision: 0 });
     expect(parsePersistedState({
       ...createDefaultState(),
       activeSession: { ...legacy, sessionRevision: MAX_SESSION_REVISION + 1 },
     }).activeSession).toBeNull();
+  });
+
+  test('migrates missing v1 epochs and rejects oversized modern epochs', () => {
+    const { sessionEpoch: _epoch, ...legacy } = createSession(2);
+    const migrated = parsePersistedState({ ...createDefaultState(), activeSession: legacy }).activeSession;
+    expect(migrated).toMatchObject({ sessionEpoch: 0 });
+    expect(parsePersistedState({
+      ...createDefaultState(),
+      activeSession: { ...legacy, sessionEpoch: MAX_SESSION_EPOCH + 1 },
+    }).activeSession).toBeNull();
+  });
+
+  test('rejects impossible profile XP and cascade statistics without damaging valid segments', () => {
+    const state = createDefaultState();
+    const settings = { effectsVolume: 0.7, haptics: false, reducedMotion: true };
+    const session = createSession(2);
+    for (const profile of [
+      { nickname: 'Лиса', level: 1, xp: 100, bestScore: 0 },
+      { nickname: 'Лиса', level: 5, xp: 180, bestScore: 0 },
+    ]) {
+      const parsed = parsePersistedState({ ...state, profile, settings, activeSession: session });
+      expect(parsed.profile).toEqual(state.profile);
+      expect(parsed.settings).toEqual(settings);
+      expect(parsed.activeSession).toEqual(session);
+    }
+    const maxLevelProfile = { nickname: 'Лиса', level: MAX_LEVEL, xp: MAX_XP, bestScore: 0 };
+    expect(parsePersistedState({ ...state, profile: maxLevelProfile }).profile).toEqual(maxLevelProfile);
+    const invalidSession = parsePersistedState({
+      ...state,
+      profile: { nickname: 'Лиса', level: 2, xp: 0, bestScore: 0 },
+      settings,
+      activeSession: { ...session, bestCascade: MAX_CASCADES + 1 },
+    });
+    expect(invalidSession.profile.nickname).toBe('Лиса');
+    expect(invalidSession.settings).toEqual(settings);
+    expect(invalidSession.activeSession).toBeNull();
   });
 
   test('restores a near-exhausted allocator without crashing on the next valid move', () => {
@@ -126,6 +164,7 @@ describe('persisted state schema', () => {
     const current = createSession(29);
     const {
       sessionId: _sessionId,
+      sessionEpoch: _epoch,
       sessionRevision: _revision,
       tileIdGeneration: _generation,
       ...preIdentitySession
@@ -141,6 +180,7 @@ describe('persisted state schema', () => {
     expect(parsePersistedState({ ...createDefaultState(), activeSession: next }).activeSession).toEqual(next);
 
     const {
+      sessionEpoch: _providerEpoch,
       sessionRevision: _providerRevision,
       tileIdGeneration: _providerGeneration,
       ...preGenerationSession
@@ -186,7 +226,12 @@ describe('persisted state schema', () => {
 
   test('migrates legacy provider identities emitted by the web renderer', () => {
     const current = createSession(29);
-    const { sessionRevision: _revision, tileIdGeneration: _generation, ...legacy } = current;
+    const {
+      sessionEpoch: _epoch,
+      sessionRevision: _revision,
+      tileIdGeneration: _generation,
+      ...legacy
+    } = current;
     const legacySessionId = 'session-29-:r0:-1';
     const restored = parsePersistedState({
       ...createDefaultState(),

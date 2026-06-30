@@ -1,7 +1,9 @@
 import {
   BOARD_SIZE,
+  MAX_CASCADES,
   MAX_LEVEL,
   MAX_SESSION_ID_LENGTH,
+  MAX_SESSION_EPOCH,
   MAX_SESSION_REVISION,
   MAX_SCORE,
   MAX_TILE_ID_COUNTER,
@@ -11,7 +13,7 @@ import {
   MAX_XP,
   TILE_COLORS,
 } from '../game/balance';
-import { GameSession, tileIdNamespaceFor } from '../game/session';
+import { GameSession, tileIdNamespaceFor, xpRequiredForLevel } from '../game/session';
 import { Special, TileColor } from '../game/model';
 import { findLegalMoves } from '../game/board';
 import { findMatches } from '../game/matches';
@@ -67,6 +69,7 @@ function parseProfile(value: unknown): Profile | null {
   if (!isRecord(value) || typeof value.nickname !== 'string') return null;
   const nickname = normalizeNickname(value.nickname);
   if (!nickname || !isBoundedInteger(value.level, 1, MAX_LEVEL) || !isBoundedInteger(value.xp, 0, MAX_XP)
+    || value.xp >= xpRequiredForLevel(value.level)
     || !isBoundedInteger(value.bestScore, 0, MAX_SCORE)) return null;
   return { nickname, level: value.level, xp: value.xp, bestScore: value.bestScore };
 }
@@ -79,19 +82,22 @@ function parseSettings(value: unknown): Settings | null {
 
 export function parseGameSession(value: unknown): GameSession | null {
   if (!isRecord(value) || (value.phase !== 'idle' && value.phase !== 'paused') || !isBoard(value.board)
-    || !isBoundedInteger(value.score, 0, MAX_SCORE) || !isBoundedInteger(value.bestCascade, 0, MAX_SCORE)
+    || !isBoundedInteger(value.score, 0, MAX_SCORE) || !isBoundedInteger(value.bestCascade, 0, MAX_CASCADES)
     || !isBoundedInteger(value.clearedTiles, 0, MAX_SCORE)
     || (value.backgroundColor !== null && !isTileColor(value.backgroundColor))
     || !isUint32(value.randomState)) return null;
   const allocator = parseAllocatorMetadata(value);
+  const sessionEpoch = !hasOwn(value, 'sessionEpoch') ? 0
+    : isBoundedInteger(value.sessionEpoch, 0, MAX_SESSION_EPOCH) ? value.sessionEpoch : null;
   const sessionRevision = !hasOwn(value, 'sessionRevision') ? 0
     : isBoundedInteger(value.sessionRevision, 0, MAX_SESSION_REVISION) ? value.sessionRevision : null;
-  if (!allocator || sessionRevision === null || (allocator.tileIdGeneration === MAX_TILE_ID_GENERATION
+  if (!allocator || sessionEpoch === null || sessionRevision === null || (allocator.tileIdGeneration === MAX_TILE_ID_GENERATION
     && MAX_TILE_ID_COUNTER - allocator.tileIdCounter <= MAX_TILE_IDS_PER_MOVE)
     || findMatches(value.board as unknown as GameSession['board']).length > 0
     || findLegalMoves(value.board as unknown as GameSession['board']).length === 0) return null;
   return {
     sessionId: allocator.sessionId,
+    sessionEpoch,
     sessionRevision,
     board: canonicalBoard(value.board as GameSession['board']),
     score: value.score as number,
