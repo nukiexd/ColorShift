@@ -1,4 +1,4 @@
-import { BOARD_SIZE } from './balance';
+import { BOARD_SIZE, MAX_BOARD_GENERATION_ATTEMPTS } from './balance';
 import {
   areAdjacent,
   createBoard,
@@ -47,6 +47,19 @@ describe('board coordinates and immutable updates', () => {
     expect(getCell(original, left)).toBe(leftTile);
     expect(getCell(original, right)).toBe(rightTile);
   });
+
+  test.each([
+    [{ row: -1, col: 0 }, { row: 0, col: 0 }],
+    [{ row: 0, col: 0 }, { row: -1, col: 0 }],
+    [{ row: BOARD_SIZE, col: 0 }, { row: 0, col: 0 }],
+    [{ row: 0, col: 0 }, { row: BOARD_SIZE, col: 0 }],
+    [{ row: 0, col: BOARD_SIZE }, { row: 0, col: 0 }],
+    [{ row: 0, col: 0 }, { row: 0, col: BOARD_SIZE }],
+  ])('swapCells is a no-op when either endpoint is out of bounds: %j, %j', (first, second) => {
+    const original = createBoard(createSeededRandom(19));
+
+    expect(swapCells(original, first, second)).toBe(original);
+  });
 });
 
 describe('deterministic board generation', () => {
@@ -76,6 +89,31 @@ describe('deterministic board generation', () => {
       expect(findLegalMoves(board).length).toBeGreaterThan(0);
     },
   );
+
+  test.each([Number.NaN, 1, -0.01])('rejects an invalid random value: %p', (value) => {
+    const create = () => createBoard({ next: () => value });
+
+    expect(create).toThrow(RangeError);
+    expect(create).toThrow('[0, 1)');
+  });
+
+  test('stops after the configured attempt cap when a source repeatedly creates dead boards', () => {
+    let calls = 0;
+    const deadBoardSource = {
+      next(): number {
+        const cell = calls % (BOARD_SIZE * BOARD_SIZE);
+        calls += 1;
+        const row = Math.floor(cell / BOARD_SIZE);
+        const col = cell % BOARD_SIZE;
+        return ((row + col) % 5 + 0.5) / 5;
+      },
+    };
+
+    expect(() => createBoard(deadBoardSource)).toThrow(
+      `Unable to generate a playable ${BOARD_SIZE}x${BOARD_SIZE} board after ${MAX_BOARD_GENERATION_ATTEMPTS} attempts`,
+    );
+    expect(calls).toBe(MAX_BOARD_GENERATION_ATTEMPTS * BOARD_SIZE * BOARD_SIZE);
+  });
 });
 
 describe('legal moves', () => {
@@ -92,6 +130,31 @@ describe('legal moves', () => {
         true,
       );
     }
+  });
+
+  test('matches brute-force right/down enumeration without duplicate pairs', () => {
+    const board = createBoard(createSeededRandom(73));
+    const expected: (readonly [Coord, Coord])[] = [];
+
+    for (let row = 0; row < BOARD_SIZE; row += 1) {
+      for (let col = 0; col < BOARD_SIZE; col += 1) {
+        const from = { row, col };
+        for (const to of [
+          { row, col: col + 1 },
+          { row: row + 1, col },
+        ]) {
+          if (to.row >= BOARD_SIZE || to.col >= BOARD_SIZE) continue;
+          const matches = findMatches(swapCells(board, from, to));
+          if (matches.some((group) => group.cells.some((cell) => sameCoord(cell, from) || sameCoord(cell, to)))) {
+            expected.push([from, to]);
+          }
+        }
+      }
+    }
+
+    const actual = findLegalMoves(board);
+    expect(actual).toEqual(expected);
+    expect(new Set(actual.map(([from, to]) => `${from.row},${from.col}-${to.row},${to.col}`)).size).toBe(actual.length);
   });
 });
 

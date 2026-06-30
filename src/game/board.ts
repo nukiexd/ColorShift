@@ -19,6 +19,10 @@ export function areAdjacent(first: Coord, second: Coord): boolean {
 }
 
 export function swapCells(board: Board, first: Coord, second: Coord): Board {
+  if (!isInBounds(board, first) || !isInBounds(board, second)) {
+    return board;
+  }
+
   const firstCell = getCell(board, first);
   const secondCell = getCell(board, second);
   return setCell(setCell(board, first, secondCell), second, firstCell);
@@ -72,7 +76,11 @@ function fillBoard(random: RandomSource, attempt: number): Board {
     board.push(currentRow);
     for (let col = 0; col < BOARD_SIZE; col += 1) {
       const available = TILE_COLORS.filter((color) => !formsImmediateMatch(board, row, col, color));
-      const color = available[Math.floor(random.next() * available.length)];
+      const randomValue = random.next();
+      if (!Number.isFinite(randomValue) || randomValue < 0 || randomValue >= 1) {
+        throw new RangeError(`RandomSource.next() must return a finite number in [0, 1); received ${randomValue}`);
+      }
+      const color = available[Math.floor(randomValue * available.length)];
       currentRow.push({ id: `tile-${attempt}-${row}-${col}`, color, special: null });
     }
   }
@@ -88,4 +96,15 @@ function formsImmediateMatch(board: readonly (readonly Tile[])[], row: number, c
 
 function equalCoord(first: Coord, second: Coord): boolean {
   return first.row === second.row && first.col === second.col;
+}
+
+function isInBounds(board: Board, coord: Coord): boolean {
+  return (
+    Number.isInteger(coord.row) &&
+    Number.isInteger(coord.col) &&
+    coord.row >= 0 &&
+    coord.row < board.length &&
+    coord.col >= 0 &&
+    coord.col < board[coord.row].length
+  );
 }
