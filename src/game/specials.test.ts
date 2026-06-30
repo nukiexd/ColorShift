@@ -47,3 +47,21 @@ test('special effects do not report empty cells as cleared', () => {
 
   expect(expandSpecialClears(board, [{ row: 0, col: 0 }])).not.toContainEqual({ row: 0, col: 1 });
 });
+
+test('an explicitly targeted rainbow does not pass its color to a chained rainbow', () => {
+  const board: Tile[][] = Array.from({ length: 6 }, (_, row) =>
+    Array.from({ length: 6 }, (_, col) => ({
+      id: `${row}-${col}`,
+      color: row < 4 ? 'coral' : 'mint',
+      special: null,
+    })),
+  );
+  board[0][0] = { ...board[0][0], color: 'sun', special: 'rainbow' };
+  board[0][1] = { ...board[0][1], color: 'sky', special: 'row' };
+  board[0][5] = { ...board[0][5], color: 'plum', special: 'rainbow' };
+
+  const cleared = expandSpecialClears(board, [{ row: 0, col: 0 }], 'sky');
+
+  expect(cleared).toContainEqual({ row: 0, col: 5 });
+  expect(cleared).toContainEqual({ row: 3, col: 5 });
+});

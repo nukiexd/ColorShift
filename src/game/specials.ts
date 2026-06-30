@@ -5,6 +5,10 @@ export function expandSpecialClears(board: Board, initial: readonly Coord[], rai
   const result: Coord[] = [];
   const queued = new Set<string>();
   const queue: Coord[] = [];
+  const explicitRainbow = rainbowColor === undefined
+    ? undefined
+    : initial.find((coord) => isInBounds(board, coord) && board[coord.row][coord.col]?.special === 'rainbow');
+  const explicitRainbowKey = explicitRainbow ? coordKey(explicitRainbow) : undefined;
 
   const enqueue = (coord: Coord): void => {
     if (!isInBounds(board, coord) || board[coord.row][coord.col] === null) return;
@@ -28,7 +32,7 @@ export function expandSpecialClears(board: Board, initial: readonly Coord[], rai
         for (let col = coord.col - 1; col <= coord.col + 1; col += 1) enqueue({ row, col });
       }
     } else if (special === 'rainbow') {
-      const target = rainbowColor ?? mostCommonColor(board, coord);
+      const target = explicitRainbowKey === coordKey(coord) ? rainbowColor : mostCommonColor(board, coord);
       for (let row = 0; row < board.length; row += 1) {
         for (let col = 0; col < board[row].length; col += 1) {
           if (board[row][col]?.color === target) enqueue({ row, col });

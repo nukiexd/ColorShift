@@ -77,7 +77,7 @@ export function resolveMove(board: Board, from: Coord, to: Coord, random: Random
 
   while (groups.length > 0 || specialInitial !== null || clearEntireBoard) {
     if (cascade > MAX_CASCADES) throw new Error(`Unable to stabilize board after ${MAX_CASCADES} cascades`);
-    const created = chooseSpecial(groups, cascade === 1 ? to : undefined);
+    const created = clearEntireBoard ? null : chooseSpecial(groups, cascade === 1 ? to : undefined);
     const matched = uniqueCoords(groups.flatMap((group) => group.cells));
     const initial = clearEntireBoard ? allOccupiedCoords(current) : uniqueCoords([...(specialInitial ?? []), ...matched]);
     const boardForExpansion = created ? withoutSpecial(current, created.coord) : current;

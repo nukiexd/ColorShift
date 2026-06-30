@@ -1,4 +1,6 @@
 import { applyGravityAndRefill, resolveMove, shuffleToPlayable } from './resolve';
+import { findLegalMoves } from './board';
+import { findMatches } from './matches';
 import { Board, RandomSource, Special, Tile, TileColor } from './model';
 import { createSeededRandom } from './random';
 
@@ -109,6 +111,18 @@ test('swapping two rainbows clears every tile exactly once', () => {
   expect(result.phases[0].scoreDelta).toBe(3600);
 });
 
+test('two rainbows suppress special creation even when their swap forms a qualifying group', () => {
+  const board = boardWith([
+    [0, 0, 'coral', 'rainbow'], [0, 1, 'coral', 'rainbow'],
+    [0, 2, 'coral'], [0, 3, 'coral'], [0, 4, 'coral'], [0, 5, 'coral'],
+  ]);
+  const result = resolveMove(board, { row: 0, col: 0 }, { row: 0, col: 1 }, createSeededRandom(177));
+
+  expect(result.phases[0].groups[0].cells).toHaveLength(6);
+  expect(result.phases[0].createdSpecial).toBeNull();
+  expect(result.phases[0].cleared).toHaveLength(36);
+});
+
 test('shuffle preserves tile identities and special values while producing a stable playable board', () => {
   const board = boardWith([[0, 0, 'coral', 'bomb']]);
   const shuffled = shuffleToPlayable(board, createSeededRandom(15));
@@ -116,6 +130,8 @@ test('shuffle preserves tile identities and special values while producing a sta
 
   expect(summarize(shuffled)).toEqual(summarize(board));
   expect(shuffled).not.toBe(board);
+  expect(findMatches(shuffled)).toHaveLength(0);
+  expect(findLegalMoves(shuffled).length).toBeGreaterThan(0);
 });
 
 test('applies the cascade-depth multiplier to a refill-created match', () => {
