@@ -1,5 +1,7 @@
 import { findLegalMoves } from './board';
 import { commitMove, createSession, applyXp, xpForScore, xpRequiredForLevel } from './session';
+import { MAX_LEVEL, MAX_SCORE, MAX_TILE_ID_COUNTER, MAX_XP } from './balance';
+import { createTileIdSource } from './random';
 
 describe('game session', () => {
   test('creates a deterministic playable idle session', () => {
@@ -71,5 +73,22 @@ describe('game session', () => {
     expect(xpForScore(100000)).toBe(100);
     expect(xpRequiredForLevel(1)).toBe(100);
     expect(applyXp({ level: 1, xp: 90 }, 250)).toEqual({ level: 3, xp: 120 });
+  });
+
+  test('bounds allocator counters before numeric precision can stall', () => {
+    expect(() => createTileIdSource(Number.MAX_SAFE_INTEGER)).toThrow(RangeError);
+    expect(() => createTileIdSource(MAX_TILE_ID_COUNTER)).toThrow(RangeError);
+    const ids = createTileIdSource(MAX_TILE_ID_COUNTER - 1, 'edge');
+    expect(ids.next()).toBe(`edge-${MAX_TILE_ID_COUNTER - 1}`);
+    expect(() => ids.next()).toThrow(RangeError);
+  });
+
+  test('bounds malformed and oversized progression inputs in constant time', () => {
+    expect(xpForScore(Infinity)).toBe(0);
+    expect(xpForScore(Number.MAX_SAFE_INTEGER)).toBe(xpForScore(MAX_SCORE));
+    expect(applyXp({ level: 1, xp: 0 }, Infinity)).toEqual({ level: 1, xp: 0 });
+    const result = applyXp({ level: Number.MAX_SAFE_INTEGER, xp: Number.MAX_SAFE_INTEGER }, Number.MAX_SAFE_INTEGER);
+    expect(result.level).toBe(MAX_LEVEL);
+    expect(result.xp).toBeLessThanOrEqual(MAX_XP);
   });
 });

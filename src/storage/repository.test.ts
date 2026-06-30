@@ -30,4 +30,18 @@ describe('state repository', () => {
     const saved = JSON.parse(storage.setItem.mock.calls[0][1]);
     expect(saved.activeSession).toBeNull();
   });
+
+  test('serializes writes so a delayed older state cannot overwrite the latest state', async () => {
+    let releaseFirst!: () => void;
+    storage.setItem
+      .mockImplementationOnce(() => new Promise<void>((resolve) => { releaseFirst = resolve; }))
+      .mockResolvedValueOnce(undefined);
+    const first = saveState({ ...createDefaultState(), profile: { ...createDefaultState().profile, nickname: 'Первый' } });
+    const second = saveState({ ...createDefaultState(), profile: { ...createDefaultState().profile, nickname: 'Второй' } });
+    await Promise.resolve();
+    expect(storage.setItem).toHaveBeenCalledTimes(1);
+    releaseFirst();
+    await expect(Promise.all([first, second])).resolves.toEqual([true, true]);
+    expect(storage.setItem.mock.calls.map((call) => JSON.parse(call[1]).profile.nickname)).toEqual(['Первый', 'Второй']);
+  });
 });

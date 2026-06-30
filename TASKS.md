@@ -30,7 +30,8 @@ Current focus: Task 4 quality fixes
 - [ ] Block mutations before hydration completes
 - [ ] Reject or recover non-playable restored boards
 - [ ] Serialize persistence writes so the latest state wins
-- [ ] Add concurrency, hydration, numeric-limit, and dead-board regression tests
+- [x] Add failing numeric-limit, write-order, and dead-board regression tests
+- [ ] Add the remaining provider concurrency and hydration regression tests
 - [ ] Pass full tests, typecheck, and lint
 - [ ] Pass quality review with no Critical or Important findings
 - [ ] Update docs/InProgress.md and push the verified checkpoint
