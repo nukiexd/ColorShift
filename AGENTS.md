@@ -150,4 +150,3 @@ A task is complete only when:
 - quality review has no open Critical or Important issues;
 - TASKS.md and docs/InProgress.md are updated;
 - no secrets or unrelated files are staged.
-

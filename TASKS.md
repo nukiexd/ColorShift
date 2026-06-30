@@ -2,8 +2,10 @@
 
 This is the concise project checklist. Detailed subtasks, review gates, and verification history live in [docs/InProgress.md](docs/InProgress.md).
 
-Last updated: 30 June 2026  
-Active branch: feature/endless-mvp  
+Last updated: 30 June 2026
+
+Active branch: feature/endless-mvp
+
 Current focus: Task 4 quality fixes
 
 ## Status
@@ -79,4 +81,3 @@ Current focus: Task 4 quality fixes
 - Background music
 - Accounts and cloud synchronization
 - Leaderboards and monetization
-
