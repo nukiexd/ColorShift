@@ -48,7 +48,7 @@ export function parsePersistedState(value: unknown): PersistedState {
     version: 1,
     profile: parseProfile(value.profile) ?? { ...DEFAULT_PROFILE },
     settings: parseSettings(value.settings) ?? { ...DEFAULT_SETTINGS },
-    activeSession: value.activeSession === null ? null : parseSession(value.activeSession),
+    activeSession: value.activeSession === null ? null : parseGameSession(value.activeSession),
   };
 }
 
@@ -76,7 +76,7 @@ function parseSettings(value: unknown): Settings | null {
   return { effectsVolume: value.effectsVolume, haptics: value.haptics, reducedMotion: value.reducedMotion };
 }
 
-function parseSession(value: unknown): GameSession | null {
+export function parseGameSession(value: unknown): GameSession | null {
   if (!isRecord(value) || (value.phase !== 'idle' && value.phase !== 'paused') || !isBoard(value.board)
     || !isBoundedInteger(value.score, 0, MAX_SCORE) || !isBoundedInteger(value.bestCascade, 0, MAX_SCORE)
     || !isBoundedInteger(value.clearedTiles, 0, MAX_SCORE)
@@ -87,7 +87,23 @@ function parseSession(value: unknown): GameSession | null {
     && MAX_TILE_ID_COUNTER - allocator.tileIdCounter <= MAX_TILE_IDS_PER_MOVE)
     || findMatches(value.board as unknown as GameSession['board']).length > 0
     || findLegalMoves(value.board as unknown as GameSession['board']).length === 0) return null;
-  return { ...value, ...allocator } as unknown as GameSession;
+  return {
+    sessionId: allocator.sessionId,
+    board: canonicalBoard(value.board as GameSession['board']),
+    score: value.score as number,
+    bestCascade: value.bestCascade as number,
+    clearedTiles: value.clearedTiles as number,
+    backgroundColor: value.backgroundColor as TileColor | null,
+    phase: value.phase,
+    randomState: value.randomState as number,
+    tileIdCounter: allocator.tileIdCounter,
+    tileIdGeneration: allocator.tileIdGeneration,
+    tileIdNamespace: allocator.tileIdNamespace,
+  };
+}
+
+function canonicalBoard(board: GameSession['board']): GameSession['board'] {
+  return board.map((row) => row.map((tile) => tile && ({ id: tile.id, color: tile.color, special: tile.special })));
 }
 
 interface AllocatorMetadata {

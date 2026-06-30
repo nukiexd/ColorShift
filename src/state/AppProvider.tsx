@@ -1,7 +1,15 @@
 import { createContext, PropsWithChildren, useCallback, useContext, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { applyXp, createSession, GameSession, xpForScore } from '../game/session';
 import { loadState, saveState } from '../storage/repository';
-import { clampVolume, createDefaultState, normalizeNickname, PersistedState, Profile, Settings } from '../storage/schema';
+import {
+  clampVolume,
+  createDefaultState,
+  normalizeNickname,
+  parseGameSession,
+  PersistedState,
+  Profile,
+  Settings,
+} from '../storage/schema';
 
 export interface GameResult {
   readonly score: number;
@@ -102,9 +110,14 @@ export function AppProvider({ children, seedFactory }: AppProviderProps) {
 
   const settleSession = useCallback((session: GameSession) => {
     if (!hydratedRef.current) return false;
-    if (session.phase !== 'idle' && session.phase !== 'paused') return false;
-    if (stateRef.current.activeSession?.sessionId !== session.sessionId) return false;
-    commitState({ ...stateRef.current, activeSession: session });
+    let safeSession: GameSession | null;
+    try {
+      safeSession = parseGameSession(session);
+    } catch {
+      return false;
+    }
+    if (!safeSession || stateRef.current.activeSession?.sessionId !== safeSession.sessionId) return false;
+    commitState({ ...stateRef.current, activeSession: safeSession });
     return true;
   }, [commitState]);
 

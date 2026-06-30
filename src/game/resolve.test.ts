@@ -206,6 +206,37 @@ test('resolveMove recovers from exhausted dead-board shuffling without losing sc
   expect(findLegalMoves(result.board).length).toBeGreaterThan(0);
 });
 
+test('shuffle exhaustion recovery allocates a fresh board through the session ID source', () => {
+  const dead: Board = Array.from({ length: 6 }, (_, row) =>
+    Array.from({ length: 6 }, (_, col) => ({
+      id: `dead-${row}-${col}`,
+      color: (['coral', 'sky', 'mint', 'sun', 'plum'] as const)[(row + col) % 5],
+      special: null,
+    })),
+  );
+  const input = dead.map((row) => row.map((tile) => ({ ...tile }))) as Tile[][];
+  input[0][0] = { ...input[0][0], color: 'coral' };
+  input[0][1] = { ...input[0][1], color: 'coral' };
+  input[0][2] = { ...input[0][2], color: 'sun' };
+  input[0][3] = { ...input[0][3], color: 'coral' };
+  const historical = new Set(input.flat().map((tile) => tile.id));
+  for (let counter = 0; counter < 40; counter += 1) historical.add(`session-${counter}`);
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    for (let row = 0; row < 6; row += 1) {
+      for (let col = 0; col < 6; col += 1) historical.add(`tile-${attempt}-${row}-${col}`);
+    }
+  }
+  const tileIds = createTileIdSource(40, 'session');
+  const draws = [0.1, 0.3, 0.5];
+  const result = resolveMove(input, { row: 0, col: 2 }, { row: 0, col: 3 }, {
+    next: () => draws.shift() ?? 0,
+  }, tileIds);
+
+  expect(result.shuffled).toBe(true);
+  expect(result.board.flat().every((tile) => !historical.has(tile!.id))).toBe(true);
+  expect(tileIds.getCounter()).toBeGreaterThanOrEqual(76);
+});
+
 test('spatial ordering uses the bottom group for background and the top group for tied special creation', () => {
   const board = boardWith([
     [0, 0, 'sky'], [1, 0, 'sky'], [2, 0, 'sky'], [3, 0, 'sky'],

@@ -31,6 +31,47 @@ describe('state repository', () => {
     expect(saved.activeSession).toBeNull();
   });
 
+  test('canonicalizes hostile extras and contains synchronous parse or serialization failures', async () => {
+    storage.setItem.mockResolvedValue(undefined);
+    const session = {
+      ...createSession(2),
+      unknownBigInt: BigInt(1),
+      toJSON: () => { throw new Error('hostile'); },
+    };
+    let saved!: Promise<boolean>;
+    expect(() => { saved = saveState({ ...createDefaultState(), activeSession: session }); }).not.toThrow();
+    await expect(saved).resolves.toBe(true);
+    const serialized = storage.setItem.mock.calls.at(-1)![1];
+    expect(serialized).not.toContain('unknownBigInt');
+    expect(JSON.parse(serialized).activeSession).toEqual(createSession(2));
+
+    const hostile: Record<string, unknown> = {};
+    Object.defineProperty(hostile, 'version', { get: () => { throw new Error('getter'); } });
+    let failed!: Promise<boolean>;
+    expect(() => { failed = saveState(hostile); }).not.toThrow();
+    await expect(failed).resolves.toBe(false);
+    await expect(saveState(createDefaultState())).resolves.toBe(true);
+  });
+
+  test('loads after pending writes so a remount cannot hydrate stale state', async () => {
+    let stored = JSON.stringify(createDefaultState());
+    let releaseWrite!: () => void;
+    storage.setItem.mockImplementationOnce((_key, value) => new Promise<void>((resolve) => {
+      releaseWrite = () => { stored = value; resolve(); };
+    }));
+    storage.getItem.mockImplementation(async () => stored);
+    const latest = { ...createDefaultState(), profile: { ...createDefaultState().profile, nickname: 'Лиса' } };
+    const pendingSave = saveState(latest);
+    const concurrentLoad = loadState();
+    for (let turn = 0; turn < 4 && !releaseWrite; turn += 1) await Promise.resolve();
+    expect(releaseWrite).toBeDefined();
+    expect(storage.getItem).not.toHaveBeenCalled();
+    releaseWrite();
+    await expect(pendingSave).resolves.toBe(true);
+    await expect(concurrentLoad).resolves.toMatchObject({ profile: { nickname: 'Лиса' } });
+    expect(JSON.parse(stored)).toMatchObject({ profile: { nickname: 'Лиса' } });
+  });
+
   test('serializes writes so a delayed older state cannot overwrite the latest state', async () => {
     let releaseFirst!: () => void;
     storage.setItem

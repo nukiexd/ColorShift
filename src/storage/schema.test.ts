@@ -184,6 +184,18 @@ describe('persisted state schema', () => {
     expect(restored).toEqual(next);
   });
 
+  test('returns a canonical session without unknown serialization properties', () => {
+    const session = {
+      ...createSession(2),
+      unknownBigInt: BigInt(1),
+      toJSON: () => ({ corrupt: true }),
+    };
+    const restored = parsePersistedState({ ...createDefaultState(), activeSession: session }).activeSession!;
+    expect(restored).toEqual(createSession(2));
+    expect(Object.prototype.hasOwnProperty.call(restored, 'unknownBigInt')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(restored, 'toJSON')).toBe(false);
+  });
+
   test('drops matched and dead active boards while preserving other segments', () => {
     const state = createDefaultState();
     const profile = { nickname: 'Лиса', level: 2, xp: 3, bestScore: 400 };

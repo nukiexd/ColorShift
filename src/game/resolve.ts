@@ -119,7 +119,7 @@ export function resolveMove(board: Board, from: Coord, to: Coord, random: Random
       current = shuffleToPlayable(current, random);
     } catch (error) {
       if (!(error instanceof Error) || !error.message.includes('Unable to shuffle board')) throw error;
-      current = createBoard(createSeededRandom(boardSeed(current)));
+      current = replaceTileIds(createBoard(createSeededRandom(boardSeed(current))), tileIds);
     }
     shuffled = true;
   }
@@ -174,6 +174,10 @@ function boardSeed(board: Board): number {
     }
   }
   return hash >>> 0;
+}
+
+function replaceTileIds(board: Board, tileIds: TileIdSource): Board {
+  return board.map((row) => row.map((tile) => tile ? { ...tile, id: tileIds.next() } : null));
 }
 
 function withoutSpecial(board: Board, coord: Coord): Board {

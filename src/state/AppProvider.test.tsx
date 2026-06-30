@@ -4,6 +4,7 @@ import { PropsWithChildren } from 'react';
 import { AppProvider, useApp } from './AppProvider';
 import { createDefaultState } from '../storage/schema';
 import { createSession } from '../game/session';
+import { MAX_SCORE } from '../game/balance';
 
 jest.mock('@react-native-async-storage/async-storage', () => ({ getItem: jest.fn(), setItem: jest.fn() }));
 const storage = AsyncStorage as jest.Mocked<typeof AsyncStorage>;
@@ -157,6 +158,40 @@ describe('AppProvider', () => {
     expect(replacement.sessionId).not.toBe(stale.sessionId);
     await act(() => { expect(result.current.settleSession({ ...stale, score: 99_000 })).toBe(false); });
     expect(result.current.activeSession).toBe(replacement);
+  });
+
+  test('rejects malformed same-session settlements without damaging profile or persistence', async () => {
+    const wrapper = ({ children }: PropsWithChildren) => <AppProvider seedFactory={() => 7}>{children}</AppProvider>;
+    const { result } = await renderHook(() => useApp(), { wrapper });
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+    await act(() => { result.current.startGame(); });
+    const original = result.current.activeSession!;
+    await act(() => { expect(result.current.updateNickname('Лиса')).toBe(true); });
+    const matchedBoard = original.board.map((row) => row.map((tile) => ({ ...tile! })));
+    matchedBoard[0][0].color = 'coral';
+    matchedBoard[0][1].color = 'coral';
+    matchedBoard[0][2].color = 'coral';
+    const candidates = [
+      { ...original, score: Number.NaN },
+      { ...original, score: MAX_SCORE + 1 },
+      { ...original, board: matchedBoard },
+      { ...original, tileIdNamespace: `${original.tileIdNamespace}-wrong` },
+    ];
+    for (const candidate of candidates) {
+      await act(() => { expect(result.current.settleSession(candidate)).toBe(false); });
+      expect(result.current.activeSession).toBe(original);
+    }
+    const hostile = { ...original };
+    Object.defineProperty(hostile, 'score', { get: () => { throw new Error('hostile'); } });
+    await act(() => { expect(result.current.settleSession(hostile)).toBe(false); });
+    expect(result.current.activeSession).toBe(original);
+    await act(() => { expect(result.current.settleSession({ ...original, score: 1_000 })).toBe(true); });
+    await act(() => { result.current.finishGame(); });
+    expect(result.current.profile).toMatchObject({ nickname: 'Лиса', bestScore: 1_000 });
+    await waitFor(() => {
+      const saved = JSON.parse(storage.setItem.mock.calls.at(-1)![1]);
+      expect(saved.profile).toMatchObject({ nickname: 'Лиса', bestScore: 1_000 });
+    });
   });
 
   test('blocks every mutation until hydration has completed', async () => {
