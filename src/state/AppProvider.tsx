@@ -114,6 +114,7 @@ export function AppProvider({ children, seedFactory }: AppProviderProps) {
     if (!hydratedRef.current) return false;
     let safeSession: GameSession | null;
     try {
+      if (session.phase !== 'idle') return false;
       safeSession = parseGameSession(session);
     } catch {
       return false;

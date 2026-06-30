@@ -264,6 +264,29 @@ describe('AppProvider', () => {
     expect(result.current.activeSession).toEqual(exact);
   });
 
+  test('rejects a paused terminal-epoch candidate before persistence recovery can canonicalize it', async () => {
+    const base = { ...createSession(2), sessionEpoch: MAX_SESSION_EPOCH };
+    storage.getItem.mockResolvedValueOnce(JSON.stringify({ ...createDefaultState(), activeSession: base }));
+    const wrapper = ({ children }: PropsWithChildren) => <AppProvider>{children}</AppProvider>;
+    const { result } = await renderHook(() => useApp(), { wrapper });
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+    await waitFor(() => expect(storage.setItem).toHaveBeenCalled());
+    storage.setItem.mockClear();
+
+    const [from, to] = findLegalMoves(base.board)[0];
+    const exact = commitMove(base, from, to);
+    const forged = { ...exact, phase: 'paused' as const };
+    await act(() => { expect(result.current.settleSession(forged, from, to)).toBe(false); });
+    expect(result.current.activeSession).toEqual(base);
+    expect(storage.setItem).not.toHaveBeenCalled();
+
+    const hostile = { ...exact };
+    Object.defineProperty(hostile, 'phase', { get: () => { throw new Error('hostile phase'); } });
+    await act(() => { expect(result.current.settleSession(hostile, from, to)).toBe(false); });
+    expect(result.current.activeSession).toEqual(base);
+    expect(storage.setItem).not.toHaveBeenCalled();
+  });
+
   test('invalidates settlements computed before pause even after resume', async () => {
     const wrapper = ({ children }: PropsWithChildren) => <AppProvider seedFactory={() => 7}>{children}</AppProvider>;
     const { result } = await renderHook(() => useApp(), { wrapper });
