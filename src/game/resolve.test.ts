@@ -174,3 +174,55 @@ test('validates refill randomness and caps impossible shuffles', () => {
   );
   expect(() => shuffleToPlayable(impossible, { next: () => 0 })).toThrow('after 200 attempts');
 });
+
+test('resolveMove recovers from exhausted dead-board shuffling without losing score', () => {
+  const dead: Board = Array.from({ length: 6 }, (_, row) =>
+    Array.from({ length: 6 }, (_, col) => ({
+      id: `dead-${row}-${col}`,
+      color: (['coral', 'sky', 'mint', 'sun', 'plum'] as const)[(row + col) % 5],
+      special: null,
+    })),
+  );
+  const input = dead.map((row) => row.map((tile) => ({ ...tile }))) as Tile[][];
+  input[0][0] = { ...input[0][0], color: 'coral' };
+  input[0][1] = { ...input[0][1], color: 'coral' };
+  input[0][2] = { ...input[0][2], color: 'sun' };
+  input[0][3] = { ...input[0][3], color: 'coral' };
+  const draws = [0.7, 0.1, 0.3, 0.5];
+  const result = resolveMove(input, { row: 0, col: 2 }, { row: 0, col: 3 }, {
+    next: () => draws.shift() ?? 0,
+  });
+
+  expect(result.accepted).toBe(true);
+  expect(result.scoreDelta).toBe(result.phases.reduce((sum, phase) => sum + phase.scoreDelta, 0));
+  expect(result.shuffled).toBe(true);
+  expect(findMatches(result.board)).toHaveLength(0);
+  expect(findLegalMoves(result.board).length).toBeGreaterThan(0);
+});
+
+test('spatial ordering uses the bottom group for background and the top group for tied special creation', () => {
+  const board = boardWith([
+    [0, 0, 'sky'], [1, 0, 'sky'], [2, 0, 'sky'], [3, 0, 'sky'],
+    [5, 0, 'coral'], [5, 1, 'coral'], [5, 2, 'coral'], [5, 3, 'sky'], [4, 3, 'coral'],
+  ]);
+  const result = resolveMove(board, { row: 4, col: 3 }, { row: 5, col: 3 }, createSeededRandom(909));
+
+  expect(result.phases[0].groups.map((group) => group.orientation)).toEqual(['vertical', 'horizontal']);
+  expect(result.phases[0].createdSpecial).toEqual({ coord: { row: 2, col: 0 }, special: 'column' });
+  expect(result.phases[0].backgroundColor).toBe('coral');
+});
+
+test('an accepted resolution does not mutate the input board, rows, or tiles', () => {
+  const board = boardWith([
+    [0, 0, 'coral'], [0, 1, 'sky'], [0, 2, 'coral'], [1, 1, 'coral'],
+  ]);
+  const snapshot = JSON.stringify(board);
+  const rows = [...board];
+  const tiles = board.map((row) => [...row]);
+  expect(resolveMove(board, { row: 0, col: 1 }, { row: 1, col: 1 }, createSeededRandom(42)).accepted).toBe(true);
+  expect(JSON.stringify(board)).toBe(snapshot);
+  board.forEach((row, rowIndex) => {
+    expect(row).toBe(rows[rowIndex]);
+    row.forEach((tile, colIndex) => expect(tile).toBe(tiles[rowIndex][colIndex]));
+  });
+});
