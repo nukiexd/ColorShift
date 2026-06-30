@@ -62,6 +62,11 @@ function addIfLegal(board: Board, moves: LegalMove[], from: Coord, to: Coord): v
     return;
   }
 
+  if (getCell(board, from)?.special === 'rainbow' || getCell(board, to)?.special === 'rainbow') {
+    moves.push([from, to]);
+    return;
+  }
+
   const matches = findMatches(swapCells(board, from, to));
   if (matches.some((group) => group.cells.some((cell) => equalCoord(cell, from) || equalCoord(cell, to)))) {
     moves.push([from, to]);

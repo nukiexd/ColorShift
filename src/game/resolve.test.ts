@@ -1,0 +1,145 @@
+import { applyGravityAndRefill, resolveMove, shuffleToPlayable } from './resolve';
+import { Board, RandomSource, Special, Tile, TileColor } from './model';
+import { createSeededRandom } from './random';
+
+const base: TileColor[][] = [
+  ['coral', 'sky', 'mint', 'sun', 'plum', 'coral'],
+  ['sky', 'mint', 'sun', 'plum', 'coral', 'sky'],
+  ['mint', 'sun', 'plum', 'coral', 'sky', 'mint'],
+  ['sun', 'plum', 'coral', 'sky', 'mint', 'sun'],
+  ['plum', 'coral', 'sky', 'mint', 'sun', 'plum'],
+  ['coral', 'sky', 'mint', 'sun', 'plum', 'coral'],
+];
+
+function boardWith(overrides: readonly [number, number, TileColor, Special?][]): Board {
+  const board: Tile[][] = base.map((colors, row) =>
+    colors.map((color, col) => ({ id: `${row}-${col}`, color, special: null })),
+  );
+  for (const [row, col, color, special = null] of overrides) {
+    board[row][col] = { id: `${row}-${col}`, color, special };
+  }
+  return board;
+}
+
+const random: RandomSource = { next: () => 0.99 };
+
+test('rejects a non-matching adjacent swap and preserves the board reference', () => {
+  const board = boardWith([]);
+  expect(resolveMove(board, { row: 0, col: 0 }, { row: 0, col: 1 }, random)).toEqual({
+    accepted: false,
+    board,
+    phases: [],
+    scoreDelta: 0,
+    shuffled: false,
+  });
+});
+
+test('resolves a three-cell clear for 300 points', () => {
+  const board = boardWith([
+    [0, 0, 'coral'], [0, 1, 'sky'], [0, 2, 'coral'], [1, 1, 'coral'],
+  ]);
+  const result = resolveMove(board, { row: 0, col: 1 }, { row: 1, col: 1 }, createSeededRandom(42));
+  expect(result.accepted).toBe(true);
+  expect(result.phases[0].cleared).toHaveLength(3);
+  expect(result.phases[0].scoreDelta).toBe(300);
+});
+
+test('gravity compacts surviving tiles and assigns non-colliding IDs to refills', () => {
+  const board = boardWith([]).map((row) => [...row]) as (Tile | null)[][];
+  board[5][0] = null;
+  board[3][0] = null;
+  const filled = applyGravityAndRefill(board, { next: () => 0 });
+  expect(filled.flat().every(Boolean)).toBe(true);
+  expect(filled[5][0]?.id).toBe('4-0');
+  expect(new Set(filled.flat().map((tile) => tile?.id)).size).toBe(36);
+});
+
+test('creates a row special at the player destination and does not clear it immediately', () => {
+  const board = boardWith([
+    [0, 0, 'coral'], [0, 1, 'coral'], [0, 2, 'coral'], [0, 3, 'sky'], [1, 3, 'coral'],
+  ]);
+  const result = resolveMove(board, { row: 1, col: 3 }, { row: 0, col: 3 }, createSeededRandom(9));
+
+  expect(result.phases[0].createdSpecial).toEqual({ coord: { row: 0, col: 3 }, special: 'row' });
+  expect(result.phases[0].cleared).not.toContainEqual({ row: 0, col: 3 });
+  expect(result.phases[0].scoreDelta).toBe(300);
+});
+
+test.each([
+  [4, 'row'],
+  [5, 'bomb'],
+  [6, 'rainbow'],
+] as const)('a horizontal match of %i creates a %s at the destination', (length, special) => {
+  const overrides: [number, number, TileColor][] = [];
+  for (let col = 0; col < length - 1; col += 1) overrides.push([0, col, 'coral']);
+  overrides.push([0, length - 1, 'sky'], [1, length - 1, 'coral']);
+  if (length < 6) overrides.push([0, length, 'plum']);
+  const result = resolveMove(
+    boardWith(overrides),
+    { row: 1, col: length - 1 },
+    { row: 0, col: length - 1 },
+    createSeededRandom(300 + length),
+  );
+
+  expect(result.phases[0].createdSpecial).toEqual({ coord: { row: 0, col: length - 1 }, special });
+});
+
+test('a vertical match of four creates a column special', () => {
+  const board = boardWith([
+    [0, 0, 'mint'], [1, 0, 'mint'], [2, 0, 'mint'], [3, 0, 'sky'], [3, 1, 'mint'],
+  ]);
+  const result = resolveMove(board, { row: 3, col: 1 }, { row: 3, col: 0 }, createSeededRandom(44));
+  expect(result.phases[0].createdSpecial).toEqual({ coord: { row: 3, col: 0 }, special: 'column' });
+});
+
+test('a rainbow swap is accepted without a natural match and clears its target color', () => {
+  const board = boardWith([[0, 0, 'coral', 'rainbow']]);
+  const result = resolveMove(board, { row: 0, col: 0 }, { row: 0, col: 1 }, createSeededRandom(21));
+
+  expect(result.accepted).toBe(true);
+  expect(result.phases[0].cleared).toEqual(expect.arrayContaining([
+    { row: 0, col: 0 }, { row: 0, col: 1 }, { row: 1, col: 0 },
+  ]));
+});
+
+test('swapping two rainbows clears every tile exactly once', () => {
+  const board = boardWith([[0, 0, 'coral', 'rainbow'], [0, 1, 'sky', 'rainbow']]);
+  const result = resolveMove(board, { row: 0, col: 0 }, { row: 0, col: 1 }, createSeededRandom(77));
+  expect(result.phases[0].cleared).toHaveLength(36);
+  expect(result.phases[0].scoreDelta).toBe(3600);
+});
+
+test('shuffle preserves tile identities and special values while producing a stable playable board', () => {
+  const board = boardWith([[0, 0, 'coral', 'bomb']]);
+  const shuffled = shuffleToPlayable(board, createSeededRandom(15));
+  const summarize = (value: Board) => value.flat().map((tile) => `${tile?.id}:${tile?.special}`).sort();
+
+  expect(summarize(shuffled)).toEqual(summarize(board));
+  expect(shuffled).not.toBe(board);
+});
+
+test('applies the cascade-depth multiplier to a refill-created match', () => {
+  const board = boardWith([
+    [0, 0, 'coral'], [0, 1, 'sky'], [0, 2, 'coral'], [1, 1, 'coral'],
+  ]);
+  const values = [0, 0, 0, 0.25, 0.45, 0.65];
+  const fallback = createSeededRandom(101);
+  const result = resolveMove(board, { row: 0, col: 1 }, { row: 1, col: 1 }, {
+    next: () => values.shift() ?? fallback.next(),
+  });
+
+  expect(result.phases[0].scoreDelta).toBe(300);
+  expect(result.phases[1].scoreDelta).toBe(600);
+  expect(result.phases[1].cascade).toBe(2);
+});
+
+test('validates refill randomness and caps impossible shuffles', () => {
+  const board = boardWith([]).map((row) => [...row]) as (Tile | null)[][];
+  board[0][0] = null;
+  expect(() => applyGravityAndRefill(board, { next: () => 1 })).toThrow(RangeError);
+
+  const impossible: Board = Array.from({ length: 6 }, (_, row) =>
+    Array.from({ length: 6 }, (_, col) => ({ id: `${row}-${col}`, color: 'coral', special: null })),
+  );
+  expect(() => shuffleToPlayable(impossible, { next: () => 0 })).toThrow('after 200 attempts');
+});

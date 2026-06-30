@@ -28,3 +28,20 @@ export interface MatchGroup {
 export interface RandomSource {
   next(): number;
 }
+
+export interface ClearPhase {
+  readonly cascade: number;
+  readonly groups: readonly MatchGroup[];
+  readonly cleared: readonly Coord[];
+  readonly createdSpecial: { readonly coord: Coord; readonly special: Exclude<Special, null> } | null;
+  readonly scoreDelta: number;
+  readonly backgroundColor: TileColor;
+}
+
+export interface MoveResolution {
+  readonly accepted: boolean;
+  readonly board: Board;
+  readonly phases: readonly ClearPhase[];
+  readonly scoreDelta: number;
+  readonly shuffled: boolean;
+}
