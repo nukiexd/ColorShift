@@ -1,4 +1,4 @@
-import { RandomSource } from './model';
+import { RandomSource, TileIdSource } from './model';
 
 export function createSeededRandom(seed: number): RandomSource {
   let state = seed >>> 0;
@@ -12,4 +12,9 @@ export function createSeededRandom(seed: number): RandomSource {
       return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
     },
   };
+}
+
+export function createTileIdSource(start = 0, namespace = 'refill'): TileIdSource {
+  let counter = start;
+  return { next: () => `${namespace}-${counter++}` };
 }

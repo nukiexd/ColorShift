@@ -29,6 +29,10 @@ export interface RandomSource {
   next(): number;
 }
 
+export interface TileIdSource {
+  next(): string;
+}
+
 export interface ClearPhase {
   readonly cascade: number;
   readonly groups: readonly MatchGroup[];

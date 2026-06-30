@@ -11,14 +11,16 @@ import {
   Special,
   Tile,
   TileColor,
+  TileIdSource,
 } from './model';
 import { expandSpecialClears } from './specials';
-import { createSeededRandom } from './random';
+import { createSeededRandom, createTileIdSource } from './random';
 
 const MAX_CASCADES = 200;
+const defaultTileIds = createTileIdSource();
 
-export function applyGravityAndRefill(board: Board, random: RandomSource): Board {
-  return refillEmptyCells(applyGravity(board), random);
+export function applyGravityAndRefill(board: Board, random: RandomSource, tileIds: TileIdSource = defaultTileIds): Board {
+  return refillEmptyCells(applyGravity(board), random, tileIds);
 }
 
 function applyGravity(board: Board): Board {
@@ -35,17 +37,15 @@ function applyGravity(board: Board): Board {
   return result;
 }
 
-function refillEmptyCells(board: Board, random: RandomSource): Board {
+function refillEmptyCells(board: Board, random: RandomSource, tileIds: TileIdSource): Board {
   const result = board.map((row) => [...row]);
   const usedIds = new Set(board.flatMap((row) => row.filter((cell): cell is Tile => cell !== null).map((tile) => tile.id)));
-  const namespace = Math.floor(nextRandom(random) * 0x100000000).toString(36);
-  let refillSerial = 0;
   for (let row = 0; row < result.length; row += 1) {
     for (let col = 0; col < result[row].length; col += 1) {
       if (result[row][col] === null) {
         const value = nextRandom(random);
         let id: string;
-        do id = `refill-${namespace}-${refillSerial++}`; while (usedIds.has(id));
+        do id = tileIds.next(); while (usedIds.has(id));
         usedIds.add(id);
         result[row][col] = { id, color: TILE_COLORS[Math.floor(value * TILE_COLORS.length)], special: null };
       }
@@ -54,7 +54,7 @@ function refillEmptyCells(board: Board, random: RandomSource): Board {
   return result;
 }
 
-export function resolveMove(board: Board, from: Coord, to: Coord, random: RandomSource): MoveResolution {
+export function resolveMove(board: Board, from: Coord, to: Coord, random: RandomSource, tileIds: TileIdSource = defaultTileIds): MoveResolution {
   if (!areAdjacent(from, to) || getCell(board, from) === null || getCell(board, to) === null || !inBounds(board, from) || !inBounds(board, to)) {
     return rejected(board);
   }
@@ -103,7 +103,7 @@ export function resolveMove(board: Board, from: Coord, to: Coord, random: Random
     }
     const boardAfterClear = next;
     const boardAfterGravity = applyGravity(boardAfterClear);
-    const boardAfterRefill = refillEmptyCells(boardAfterGravity, random);
+    const boardAfterRefill = refillEmptyCells(boardAfterGravity, random, tileIds);
     phases.push({ cascade, groups, cleared, createdSpecial: created, scoreDelta, backgroundColor,
       boardBefore, boardAfterClear, boardAfterGravity, boardAfterRefill });
     current = boardAfterRefill;

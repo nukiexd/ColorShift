@@ -2,7 +2,7 @@ import { applyGravityAndRefill, resolveMove, shuffleToPlayable } from './resolve
 import { findLegalMoves } from './board';
 import { findMatches } from './matches';
 import { Board, RandomSource, Special, Tile, TileColor } from './model';
-import { createSeededRandom } from './random';
+import { createSeededRandom, createTileIdSource } from './random';
 
 const base: TileColor[][] = [
   ['coral', 'sky', 'mint', 'sun', 'plum', 'coral'],
@@ -57,15 +57,21 @@ test('gravity compacts surviving tiles and assigns non-colliding IDs to refills'
 });
 
 test('successive refill calls with one random source do not reuse cleared refill IDs', () => {
-  const source = createSeededRandom(555);
+  const source = { next: () => 0 };
+  const ids = createTileIdSource(10, 'session');
   const firstInput = boardWith([]).map((row) => [...row]) as (Tile | null)[][];
   firstInput[0][0] = null;
-  const first = applyGravityAndRefill(firstInput, source);
+  const first = applyGravityAndRefill(firstInput, source, ids);
   const firstId = first[0][0]?.id;
   const secondInput = first.map((row) => [...row]) as (Tile | null)[][];
   secondInput[0][0] = null;
-  const second = applyGravityAndRefill(secondInput, source);
+  const second = applyGravityAndRefill(secondInput, source, ids);
   expect(second[0][0]?.id).not.toBe(firstId);
+});
+
+test('tile ID allocators have deterministic starts and namespaces', () => {
+  const ids = createTileIdSource(7, 'game');
+  expect([ids.next(), ids.next(), ids.next()]).toEqual(['game-7', 'game-8', 'game-9']);
 });
 
 test('creates a row special at the player destination and does not clear it immediately', () => {
@@ -150,7 +156,7 @@ test('applies the cascade-depth multiplier to a refill-created match', () => {
   const board = boardWith([
     [0, 0, 'coral'], [0, 1, 'sky'], [0, 2, 'coral'], [1, 1, 'coral'],
   ]);
-  const values = [0, 0, 0, 0, 0.25, 0.45, 0.65];
+  const values = [0, 0, 0, 0.45, 0.65];
   const fallback = createSeededRandom(101);
   const result = resolveMove(board, { row: 0, col: 1 }, { row: 1, col: 1 }, {
     next: () => values.shift() ?? fallback.next(),
@@ -188,7 +194,7 @@ test('resolveMove recovers from exhausted dead-board shuffling without losing sc
   input[0][1] = { ...input[0][1], color: 'coral' };
   input[0][2] = { ...input[0][2], color: 'sun' };
   input[0][3] = { ...input[0][3], color: 'coral' };
-  const draws = [0.7, 0.1, 0.3, 0.5];
+  const draws = [0.1, 0.3, 0.5];
   const result = resolveMove(input, { row: 0, col: 2 }, { row: 0, col: 3 }, {
     next: () => draws.shift() ?? 0,
   });
