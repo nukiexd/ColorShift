@@ -36,6 +36,10 @@ export interface ClearPhase {
   readonly createdSpecial: { readonly coord: Coord; readonly special: Exclude<Special, null> } | null;
   readonly scoreDelta: number;
   readonly backgroundColor: TileColor;
+  readonly boardBefore: Board;
+  readonly boardAfterClear: Board;
+  readonly boardAfterGravity: Board;
+  readonly boardAfterRefill: Board;
 }
 
 export interface MoveResolution {

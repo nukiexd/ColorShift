@@ -1,5 +1,5 @@
 import { MAX_BOARD_GENERATION_ATTEMPTS, TILE_COLORS } from './balance';
-import { areAdjacent, findLegalMoves, getCell, swapCells } from './board';
+import { areAdjacent, createBoard, findLegalMoves, getCell, swapCells } from './board';
 import { findMatches } from './matches';
 import {
   Board,
@@ -13,30 +13,39 @@ import {
   TileColor,
 } from './model';
 import { expandSpecialClears } from './specials';
+import { createSeededRandom } from './random';
 
 const MAX_CASCADES = 200;
 
 export function applyGravityAndRefill(board: Board, random: RandomSource): Board {
+  return refillEmptyCells(applyGravity(board), random);
+}
+
+function applyGravity(board: Board): Board {
+  const result = board.map((row) => row.map(() => null)) as (Tile | null)[][];
+  const columns = board.reduce((maximum, row) => Math.max(maximum, row.length), 0);
+  for (let col = 0; col < columns; col += 1) {
+    const survivors = board.map((row) => row[col]).filter((cell): cell is Tile => cell !== null && cell !== undefined);
+    let target = board.length - 1;
+    for (let index = survivors.length - 1; index >= 0; index -= 1) {
+      while (target >= 0 && col >= result[target].length) target -= 1;
+      if (target >= 0) result[target--][col] = survivors[index];
+    }
+  }
+  return result;
+}
+
+function refillEmptyCells(board: Board, random: RandomSource): Board {
   const result = board.map((row) => [...row]);
   const usedIds = new Set(board.flatMap((row) => row.filter((cell): cell is Tile => cell !== null).map((tile) => tile.id)));
+  const namespace = Math.floor(nextRandom(random) * 0x100000000).toString(36);
   let refillSerial = 0;
-  const columns = board.reduce((maximum, row) => Math.max(maximum, row.length), 0);
-
-  for (let col = 0; col < columns; col += 1) {
-    const survivors: Tile[] = [];
-    for (let row = board.length - 1; row >= 0; row -= 1) {
-      const tile = board[row]?.[col];
-      if (tile) survivors.push(tile);
-    }
-    let survivorIndex = 0;
-    for (let row = board.length - 1; row >= 0; row -= 1) {
-      if (col >= result[row].length) continue;
-      if (survivorIndex < survivors.length) {
-        result[row][col] = survivors[survivorIndex++];
-      } else {
+  for (let row = 0; row < result.length; row += 1) {
+    for (let col = 0; col < result[row].length; col += 1) {
+      if (result[row][col] === null) {
         const value = nextRandom(random);
         let id: string;
-        do id = `refill-${refillSerial++}`; while (usedIds.has(id));
+        do id = `refill-${namespace}-${refillSerial++}`; while (usedIds.has(id));
         usedIds.add(id);
         result[row][col] = { id, color: TILE_COLORS[Math.floor(value * TILE_COLORS.length)], special: null };
       }
@@ -54,7 +63,7 @@ export function resolveMove(board: Board, from: Coord, to: Coord, random: Random
   const movedFrom = getCell(current, to);
   const movedTo = getCell(current, from);
   const rainbowSwap = movedFrom?.special === 'rainbow' || movedTo?.special === 'rainbow';
-  let groups = findMatches(current);
+  let groups = orderGroups(findMatches(current));
   if (!rainbowSwap && !groups.some((group) => group.cells.some((coord) => sameCoord(coord, from) || sameCoord(coord, to)))) {
     return rejected(board);
   }
@@ -85,16 +94,20 @@ export function resolveMove(board: Board, from: Coord, to: Coord, random: Random
     if (created) cleared = cleared.filter((coord) => !sameCoord(coord, created.coord));
     const backgroundColor = groups.at(-1)?.color ?? rainbowColor ?? TILE_COLORS[0];
     const scoreDelta = 100 * cleared.length * cascade;
-    phases.push({ cascade, groups, cleared, createdSpecial: created, scoreDelta, backgroundColor });
-
+    const boardBefore = current;
     const next = current.map((row) => [...row]);
     for (const coord of cleared) next[coord.row][coord.col] = null;
     if (created) {
       const source = getCell(current, created.coord);
       if (source) next[created.coord.row][created.coord.col] = { ...source, special: created.special };
     }
-    current = applyGravityAndRefill(next, random);
-    groups = findMatches(current);
+    const boardAfterClear = next;
+    const boardAfterGravity = applyGravity(boardAfterClear);
+    const boardAfterRefill = refillEmptyCells(boardAfterGravity, random);
+    phases.push({ cascade, groups, cleared, createdSpecial: created, scoreDelta, backgroundColor,
+      boardBefore, boardAfterClear, boardAfterGravity, boardAfterRefill });
+    current = boardAfterRefill;
+    groups = orderGroups(findMatches(current));
     cascade += 1;
     specialInitial = null;
     rainbowColor = undefined;
@@ -103,7 +116,12 @@ export function resolveMove(board: Board, from: Coord, to: Coord, random: Random
 
   let shuffled = false;
   if (findLegalMoves(current).length === 0) {
-    current = shuffleToPlayable(current, random);
+    try {
+      current = shuffleToPlayable(current, random);
+    } catch (error) {
+      if (!(error instanceof Error) || !error.message.includes('Unable to shuffle board')) throw error;
+      current = createBoard(createSeededRandom(boardSeed(current)));
+    }
     shuffled = true;
   }
   return { accepted: true, board: current, phases, scoreDelta: phases.reduce((sum, phase) => sum + phase.scoreDelta, 0), shuffled };
@@ -139,6 +157,24 @@ function chooseSpecial(groups: readonly MatchGroup[], playerAnchor?: Coord): { c
       ? 'bomb'
       : group.orientation === 'horizontal' ? 'row' : 'column';
   return { coord, special };
+}
+
+function orderGroups(groups: readonly MatchGroup[]): MatchGroup[] {
+  return [...groups].sort((left, right) => {
+    const leftMin = left.cells.reduce((best, cell) => cell.row < best.row || (cell.row === best.row && cell.col < best.col) ? cell : best);
+    const rightMin = right.cells.reduce((best, cell) => cell.row < best.row || (cell.row === best.row && cell.col < best.col) ? cell : best);
+    return leftMin.row - rightMin.row || leftMin.col - rightMin.col || (left.orientation === right.orientation ? 0 : left.orientation === 'horizontal' ? -1 : 1);
+  });
+}
+
+function boardSeed(board: Board): number {
+  let hash = 2166136261;
+  for (const tile of board.flat()) {
+    for (const char of `${tile?.id ?? '-'}:${tile?.color ?? '-'}:${tile?.special ?? '-'}`) {
+      hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
+    }
+  }
+  return hash >>> 0;
 }
 
 function withoutSpecial(board: Board, coord: Coord): Board {

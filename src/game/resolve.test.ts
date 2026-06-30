@@ -56,6 +56,18 @@ test('gravity compacts surviving tiles and assigns non-colliding IDs to refills'
   expect(new Set(filled.flat().map((tile) => tile?.id)).size).toBe(36);
 });
 
+test('successive refill calls with one random source do not reuse cleared refill IDs', () => {
+  const source = createSeededRandom(555);
+  const firstInput = boardWith([]).map((row) => [...row]) as (Tile | null)[][];
+  firstInput[0][0] = null;
+  const first = applyGravityAndRefill(firstInput, source);
+  const firstId = first[0][0]?.id;
+  const secondInput = first.map((row) => [...row]) as (Tile | null)[][];
+  secondInput[0][0] = null;
+  const second = applyGravityAndRefill(secondInput, source);
+  expect(second[0][0]?.id).not.toBe(firstId);
+});
+
 test('creates a row special at the player destination and does not clear it immediately', () => {
   const board = boardWith([
     [0, 0, 'coral'], [0, 1, 'coral'], [0, 2, 'coral'], [0, 3, 'sky'], [1, 3, 'coral'],
@@ -138,7 +150,7 @@ test('applies the cascade-depth multiplier to a refill-created match', () => {
   const board = boardWith([
     [0, 0, 'coral'], [0, 1, 'sky'], [0, 2, 'coral'], [1, 1, 'coral'],
   ]);
-  const values = [0, 0, 0, 0.25, 0.45, 0.65];
+  const values = [0, 0, 0, 0, 0.25, 0.45, 0.65];
   const fallback = createSeededRandom(101);
   const result = resolveMove(board, { row: 0, col: 1 }, { row: 1, col: 1 }, {
     next: () => values.shift() ?? fallback.next(),
@@ -147,6 +159,9 @@ test('applies the cascade-depth multiplier to a refill-created match', () => {
   expect(result.phases[0].scoreDelta).toBe(300);
   expect(result.phases[1].scoreDelta).toBe(600);
   expect(result.phases[1].cascade).toBe(2);
+  expect(result.phases[0].boardAfterRefill).toEqual(result.phases[1].boardBefore);
+  expect(result.phases[0].boardAfterClear).not.toBe(result.phases[0].boardBefore);
+  expect(result.phases[0].boardAfterGravity).not.toBe(result.phases[0].boardAfterClear);
 });
 
 test('validates refill randomness and caps impossible shuffles', () => {
