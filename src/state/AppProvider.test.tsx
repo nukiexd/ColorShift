@@ -3,8 +3,9 @@ import { act, renderHook, waitFor } from '@testing-library/react-native';
 import { PropsWithChildren } from 'react';
 import { AppProvider, useApp } from './AppProvider';
 import { createDefaultState } from '../storage/schema';
-import { createSession } from '../game/session';
-import { MAX_SCORE } from '../game/balance';
+import { commitMove, createSession } from '../game/session';
+import { MAX_SCORE, MAX_TILE_ID_COUNTER } from '../game/balance';
+import { findLegalMoves } from '../game/board';
 
 jest.mock('@react-native-async-storage/async-storage', () => ({ getItem: jest.fn(), setItem: jest.fn() }));
 const storage = AsyncStorage as jest.Mocked<typeof AsyncStorage>;
@@ -30,7 +31,9 @@ describe('AppProvider', () => {
     await act(() => { expect(result.current.updateNickname('x')).toBe(false); });
     expect(result.current.profile.nickname).toBe('Игрок');
 
-    await act(() => { result.current.settleSession({ ...original!, score: 1000, bestCascade: 2, clearedTiles: 9 }); });
+    const [from, to] = findLegalMoves(original!.board)[0];
+    const advanced = commitMove(original!, from, to);
+    await act(() => { result.current.settleSession({ ...advanced, score: 1000, bestCascade: 2, clearedTiles: 9 }); });
     let finish!: ReturnType<typeof result.current.finishGame>;
     await act(() => { finish = result.current.finishGame(); });
     expect(finish).toMatchObject({ xpEarned: 10, result: { score: 1000, bestCascade: 2, clearedTiles: 9, isNewBest: true } });
@@ -121,7 +124,9 @@ describe('AppProvider', () => {
     const { result } = await renderHook(() => useApp(), { wrapper });
     await waitFor(() => expect(result.current.hydrated).toBe(true));
     await act(() => { result.current.startGame(); });
-    const settled = { ...result.current.activeSession!, score: 4_000, bestCascade: 3, clearedTiles: 12 };
+    const current = result.current.activeSession!;
+    const [from, to] = findLegalMoves(current.board)[0];
+    const settled = { ...commitMove(current, from, to), score: 4_000, bestCascade: 3, clearedTiles: 12 };
     let outcome!: ReturnType<typeof result.current.finishGame>;
     await act(() => {
       expect(result.current.settleSession(settled)).toBe(true);
@@ -185,12 +190,103 @@ describe('AppProvider', () => {
     Object.defineProperty(hostile, 'score', { get: () => { throw new Error('hostile'); } });
     await act(() => { expect(result.current.settleSession(hostile)).toBe(false); });
     expect(result.current.activeSession).toBe(original);
-    await act(() => { expect(result.current.settleSession({ ...original, score: 1_000 })).toBe(true); });
+    const [from, to] = findLegalMoves(original.board)[0];
+    await act(() => { expect(result.current.settleSession({ ...commitMove(original, from, to), score: 1_000 })).toBe(true); });
     await act(() => { result.current.finishGame(); });
     expect(result.current.profile).toMatchObject({ nickname: 'Лиса', bestScore: 1_000 });
     await waitFor(() => {
       const saved = JSON.parse(storage.setItem.mock.calls.at(-1)![1]);
       expect(saved.profile).toMatchObject({ nickname: 'Лиса', bestScore: 1_000 });
+    });
+  });
+
+  test('accepts only the first of two competing sibling settlements', async () => {
+    const wrapper = ({ children }: PropsWithChildren) => <AppProvider seedFactory={() => 0}>{children}</AppProvider>;
+    const { result } = await renderHook(() => useApp(), { wrapper });
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+    await act(() => { result.current.startGame(); });
+    const base = result.current.activeSession!;
+    const siblings = findLegalMoves(base.board).map(([from, to]) => commitMove(base, from, to));
+    const lower = siblings.find((candidate) => siblings.some((other) => other.tileIdCounter > candidate.tileIdCounter));
+    const higher = lower && siblings.find((candidate) => candidate.tileIdCounter > lower.tileIdCounter);
+    expect(lower).toBeDefined();
+    expect(higher).toBeDefined();
+    let lowerAccepted!: boolean;
+    let higherAccepted!: boolean;
+    await act(() => {
+      lowerAccepted = result.current.settleSession(lower!);
+      higherAccepted = result.current.settleSession(higher!);
+    });
+    expect(lowerAccepted).toBe(true);
+    expect(higherAccepted).toBe(false);
+    expect(result.current.activeSession).toEqual(lower);
+  });
+
+  test('requires sequential revisions to be delivered without gaps', async () => {
+    const wrapper = ({ children }: PropsWithChildren) => <AppProvider seedFactory={() => 7}>{children}</AppProvider>;
+    const { result } = await renderHook(() => useApp(), { wrapper });
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+    await act(() => { result.current.startGame(); });
+    const base = result.current.activeSession!;
+    const [firstFrom, firstTo] = findLegalMoves(base.board)[0];
+    const revisionOne = commitMove(base, firstFrom, firstTo);
+    const [secondFrom, secondTo] = findLegalMoves(revisionOne.board)[0];
+    const revisionTwo = commitMove(revisionOne, secondFrom, secondTo);
+    await act(() => { expect(result.current.settleSession(revisionTwo)).toBe(false); });
+    expect(result.current.activeSession).toEqual(base);
+    await act(() => { expect(result.current.settleSession(revisionOne)).toBe(true); });
+    await act(() => { expect(result.current.settleSession(revisionTwo)).toBe(true); });
+    expect(result.current.activeSession).toEqual(revisionTwo);
+  });
+
+  test('rejects a stale pre-rollover snapshot after rollover settles', async () => {
+    const base = { ...createSession(2), tileIdCounter: MAX_TILE_ID_COUNTER - 1 };
+    storage.getItem.mockResolvedValueOnce(JSON.stringify({ ...createDefaultState(), activeSession: base }));
+    const wrapper = ({ children }: PropsWithChildren) => <AppProvider>{children}</AppProvider>;
+    const { result } = await renderHook(() => useApp(), { wrapper });
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+    const [from, to] = findLegalMoves(base.board)[0];
+    const rolled = commitMove(base, from, to);
+    await act(() => { expect(result.current.settleSession(rolled)).toBe(true); });
+    await act(() => { expect(result.current.settleSession(base)).toBe(false); });
+    expect(result.current.activeSession).toEqual(rolled);
+  });
+
+  test('rejects older, equal-modified, and legacy-reset snapshots of the active session', async () => {
+    const wrapper = ({ children }: PropsWithChildren) => <AppProvider seedFactory={() => 7}>{children}</AppProvider>;
+    const { result } = await renderHook(() => useApp(), { wrapper });
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+    await act(() => { result.current.startGame(); });
+    const original = result.current.activeSession!;
+    const [from, to] = findLegalMoves(original.board)[0];
+    const newer = commitMove(original, from, to);
+    await act(() => { expect(result.current.settleSession(newer)).toBe(true); });
+    expect(result.current.activeSession).toEqual(newer);
+
+    const equalModified = { ...newer, score: newer.score + 100 };
+    const equalModifiedBoard = { ...newer, board: original.board };
+    const { tileIdGeneration: _generation, sessionRevision: _revision, ...legacyReset } = {
+      ...newer,
+      tileIdNamespace: 'session-7',
+    };
+    for (const stale of [original, equalModified, equalModifiedBoard, legacyReset]) {
+      await act(() => { expect(result.current.settleSession(stale as typeof newer)).toBe(false); });
+      expect(result.current.activeSession).toEqual(newer);
+    }
+    expect(result.current.activeSession).toMatchObject({
+      sessionRevision: newer.sessionRevision,
+      randomState: newer.randomState,
+      tileIdGeneration: newer.tileIdGeneration,
+      tileIdCounter: newer.tileIdCounter,
+    });
+    await waitFor(() => {
+      const saved = JSON.parse(storage.setItem.mock.calls.at(-1)![1]).activeSession;
+      expect(saved).toMatchObject({
+        sessionRevision: newer.sessionRevision,
+        randomState: newer.randomState,
+        tileIdGeneration: newer.tileIdGeneration,
+        tileIdCounter: newer.tileIdCounter,
+      });
     });
   });
 

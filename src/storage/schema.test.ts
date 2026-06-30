@@ -1,6 +1,13 @@
 import { commitMove, createSession, xpForScore } from '../game/session';
 import { createDefaultState, parsePersistedState } from './schema';
-import { MAX_LEVEL, MAX_SCORE, MAX_TILE_ID_COUNTER, MAX_TILE_IDS_PER_MOVE, MAX_XP } from '../game/balance';
+import {
+  MAX_LEVEL,
+  MAX_SCORE,
+  MAX_SESSION_REVISION,
+  MAX_TILE_ID_COUNTER,
+  MAX_TILE_IDS_PER_MOVE,
+  MAX_XP,
+} from '../game/balance';
 import { Board, Tile, TileColor } from '../game/model';
 import { findLegalMoves } from '../game/board';
 
@@ -69,6 +76,16 @@ describe('persisted state schema', () => {
     expect(parsePersistedState({ ...state, activeSession: { ...createSession(7), tileIdCounter: MAX_TILE_ID_COUNTER } }).activeSession).toBeNull();
   });
 
+  test('migrates missing v1 revisions and rejects oversized modern revisions', () => {
+    const { sessionRevision: _revision, ...legacy } = createSession(2);
+    const migrated = parsePersistedState({ ...createDefaultState(), activeSession: legacy }).activeSession;
+    expect(migrated).toMatchObject({ sessionRevision: 0 });
+    expect(parsePersistedState({
+      ...createDefaultState(),
+      activeSession: { ...legacy, sessionRevision: MAX_SESSION_REVISION + 1 },
+    }).activeSession).toBeNull();
+  });
+
   test('restores a near-exhausted allocator without crashing on the next valid move', () => {
     const session = createSession(2);
     const restored = parsePersistedState({
@@ -107,7 +124,12 @@ describe('persisted state schema', () => {
 
   test('migrates genuine legacy v1 allocator metadata and keeps the session playable', () => {
     const current = createSession(29);
-    const { sessionId: _sessionId, tileIdGeneration: _generation, ...preIdentitySession } = current;
+    const {
+      sessionId: _sessionId,
+      sessionRevision: _revision,
+      tileIdGeneration: _generation,
+      ...preIdentitySession
+    } = current;
     const legacyPreIdentity = { ...preIdentitySession, tileIdNamespace: 'session-29' };
     const restored = parsePersistedState({ ...createDefaultState(), activeSession: legacyPreIdentity }).activeSession;
     expect(restored).not.toBeNull();
@@ -118,7 +140,11 @@ describe('persisted state schema', () => {
     expect(next.score).toBeGreaterThan(0);
     expect(parsePersistedState({ ...createDefaultState(), activeSession: next }).activeSession).toEqual(next);
 
-    const { tileIdGeneration: _providerGeneration, ...preGenerationSession } = current;
+    const {
+      sessionRevision: _providerRevision,
+      tileIdGeneration: _providerGeneration,
+      ...preGenerationSession
+    } = current;
     const legacyProvider = {
       ...preGenerationSession,
       sessionId: `${current.sessionId}-_r_0_-1`,
@@ -129,7 +155,7 @@ describe('persisted state schema', () => {
     expect(providerRestored!.tileIdNamespace).toBe(`cs2-${legacyProvider.sessionId}-g0`);
 
     const priorRollover = {
-      ...current,
+      ...preGenerationSession,
       tileIdCounter: 12,
       tileIdGeneration: 1,
       tileIdNamespace: `${current.sessionId}-refill-1`,
@@ -160,7 +186,7 @@ describe('persisted state schema', () => {
 
   test('migrates legacy provider identities emitted by the web renderer', () => {
     const current = createSession(29);
-    const { tileIdGeneration: _generation, ...legacy } = current;
+    const { sessionRevision: _revision, tileIdGeneration: _generation, ...legacy } = current;
     const legacySessionId = 'session-29-:r0:-1';
     const restored = parsePersistedState({
       ...createDefaultState(),

@@ -116,7 +116,9 @@ export function AppProvider({ children, seedFactory }: AppProviderProps) {
     } catch {
       return false;
     }
-    if (!safeSession || stateRef.current.activeSession?.sessionId !== safeSession.sessionId) return false;
+    const currentSession = stateRef.current.activeSession;
+    if (!safeSession || currentSession?.sessionId !== safeSession.sessionId
+      || safeSession.sessionRevision !== currentSession.sessionRevision + 1) return false;
     commitState({ ...stateRef.current, activeSession: safeSession });
     return true;
   }, [commitState]);

@@ -2,6 +2,7 @@ import {
   BOARD_SIZE,
   MAX_LEVEL,
   MAX_SESSION_ID_LENGTH,
+  MAX_SESSION_REVISION,
   MAX_SCORE,
   MAX_TILE_ID_COUNTER,
   MAX_TILE_ID_GENERATION,
@@ -83,12 +84,15 @@ export function parseGameSession(value: unknown): GameSession | null {
     || (value.backgroundColor !== null && !isTileColor(value.backgroundColor))
     || !isUint32(value.randomState)) return null;
   const allocator = parseAllocatorMetadata(value);
-  if (!allocator || (allocator.tileIdGeneration === MAX_TILE_ID_GENERATION
+  const sessionRevision = !hasOwn(value, 'sessionRevision') ? 0
+    : isBoundedInteger(value.sessionRevision, 0, MAX_SESSION_REVISION) ? value.sessionRevision : null;
+  if (!allocator || sessionRevision === null || (allocator.tileIdGeneration === MAX_TILE_ID_GENERATION
     && MAX_TILE_ID_COUNTER - allocator.tileIdCounter <= MAX_TILE_IDS_PER_MOVE)
     || findMatches(value.board as unknown as GameSession['board']).length > 0
     || findLegalMoves(value.board as unknown as GameSession['board']).length === 0) return null;
   return {
     sessionId: allocator.sessionId,
+    sessionRevision,
     board: canonicalBoard(value.board as GameSession['board']),
     score: value.score as number,
     bestCascade: value.bestCascade as number,

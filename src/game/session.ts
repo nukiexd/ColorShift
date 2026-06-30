@@ -5,6 +5,7 @@ import { resolveMove } from './resolve';
 import {
   MAX_LEVEL,
   MAX_SCORE,
+  MAX_SESSION_REVISION,
   MAX_TILE_ID_COUNTER,
   MAX_TILE_ID_GENERATION,
   MAX_TILE_IDS_PER_MOVE,
@@ -15,6 +16,7 @@ export type SessionPhase = 'idle' | 'preview' | 'swapping' | 'clearing' | 'falli
 
 export interface GameSession {
   readonly sessionId: string;
+  readonly sessionRevision: number;
   readonly board: Board;
   readonly score: number;
   readonly bestCascade: number;
@@ -41,6 +43,7 @@ export function createSession(seed = 0, sessionId = `session-${seed >>> 0}`): Ga
   const board = createBoard(random);
   return {
     sessionId,
+    sessionRevision: 0,
     board,
     score: 0,
     bestCascade: 0,
@@ -55,7 +58,7 @@ export function createSession(seed = 0, sessionId = `session-${seed >>> 0}`): Ga
 }
 
 export function commitMove(session: GameSession, from: Coord, to: Coord): GameSession {
-  if (session.phase !== 'idle') return session;
+  if (session.phase !== 'idle' || session.sessionRevision >= MAX_SESSION_REVISION) return session;
   const random = createSeededRandom(session.randomState);
   let tileIdCounter = session.tileIdCounter;
   let tileIdGeneration = session.tileIdGeneration;
@@ -74,6 +77,7 @@ export function commitMove(session: GameSession, from: Coord, to: Coord): GameSe
   const lastPhase = resolution.phases.at(-1);
   return {
     ...session,
+    sessionRevision: session.sessionRevision + 1,
     board: resolution.board,
     score: boundedSum(session.score, resolution.scoreDelta),
     bestCascade: Math.min(MAX_SCORE, Math.max(session.bestCascade, ...resolution.phases.map((phase) => phase.cascade))),

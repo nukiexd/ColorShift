@@ -1,6 +1,6 @@
 import { findLegalMoves } from './board';
 import { commitMove, createSession, applyXp, xpForScore, xpRequiredForLevel } from './session';
-import { MAX_LEVEL, MAX_SCORE, MAX_TILE_ID_COUNTER, MAX_XP } from './balance';
+import { MAX_LEVEL, MAX_SCORE, MAX_SESSION_REVISION, MAX_TILE_ID_COUNTER, MAX_XP } from './balance';
 import { createTileIdSource } from './random';
 
 describe('game session', () => {
@@ -9,6 +9,7 @@ describe('game session', () => {
     const second = createSession(123);
     expect(first).toEqual(second);
     expect(first.phase).toBe('idle');
+    expect(first.sessionRevision).toBe(0);
     expect(findLegalMoves(first.board).length).toBeGreaterThan(0);
   });
 
@@ -19,6 +20,7 @@ describe('game session', () => {
 
     const rejected = commitMove(session, { row: 0, col: 0 }, { row: 5, col: 5 });
     expect(rejected).toEqual(session);
+    expect(rejected.sessionRevision).toBe(session.sessionRevision);
   });
 
   test('an accepted move updates score, cleared tiles, cascade and continuation state', () => {
@@ -30,6 +32,7 @@ describe('game session', () => {
     expect(next.bestCascade).toBeGreaterThanOrEqual(1);
     expect(next.randomState).not.toBe(session.randomState);
     expect(next.tileIdCounter).toBeGreaterThan(session.tileIdCounter);
+    expect(next.sessionRevision).toBe(session.sessionRevision + 1);
     expect(next.phase).toBe('idle');
   });
 
@@ -81,6 +84,22 @@ describe('game session', () => {
     const ids = createTileIdSource(MAX_TILE_ID_COUNTER - 1, 'edge');
     expect(ids.next()).toBe(`edge-${MAX_TILE_ID_COUNTER - 1}`);
     expect(() => ids.next()).toThrow(RangeError);
+  });
+
+  test('allocator rollover still advances the causal session revision', () => {
+    const session = { ...createSession(2), tileIdCounter: MAX_TILE_ID_COUNTER - 1 };
+    const [from, to] = findLegalMoves(session.board)[0];
+    const next = commitMove(session, from, to);
+    expect(next.tileIdGeneration).toBe(session.tileIdGeneration + 1);
+    expect(next.tileIdCounter).toBeLessThan(session.tileIdCounter);
+    expect(next.sessionRevision).toBe(session.sessionRevision + 1);
+  });
+
+  test('stops deterministically at the bounded session revision limit', () => {
+    expect(MAX_SESSION_REVISION).toBeDefined();
+    const session = { ...createSession(2), sessionRevision: MAX_SESSION_REVISION };
+    const [from, to] = findLegalMoves(session.board)[0];
+    expect(commitMove(session, from, to)).toBe(session);
   });
 
   test('bounds malformed and oversized progression inputs in constant time', () => {
