@@ -8,7 +8,7 @@ import { StatusBar } from 'expo-status-bar';
 import { AppProvider } from '@/state/AppProvider';
 import { colors } from '@/ui/tokens';
 
-void SplashScreen.preventAutoHideAsync();
+void SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
@@ -18,7 +18,7 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    if (fontsLoaded || fontError) void SplashScreen.hideAsync();
+    if (fontsLoaded || fontError) void SplashScreen.hideAsync().catch(() => undefined);
   }, [fontError, fontsLoaded]);
 
   if (!fontsLoaded && !fontError) return null;

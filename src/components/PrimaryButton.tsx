@@ -25,7 +25,11 @@ export function PrimaryButton({ label, onPress, disabled = false, variant = 'pri
         disabled && styles.disabled,
         style,
       ]}>
-      <Text style={[styles.label, variant === 'quiet' && styles.quietLabel]}>{label}</Text>
+      <Text style={[
+        styles.label,
+        variant === 'primary' && styles.primaryLabel,
+        variant === 'quiet' && styles.quietLabel,
+      ]}>{label}</Text>
     </Pressable>
   );
 }
@@ -47,5 +51,6 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.72, borderColor: colors.focus },
   disabled: { opacity: 0.42 },
   label: { color: colors.text, fontFamily: typography.semibold, fontSize: 16 },
+  primaryLabel: { color: colors.background },
   quietLabel: { color: colors.textMuted },
 });

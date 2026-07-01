@@ -12,25 +12,22 @@ interface PlayerCardProps {
 
 export function PlayerCard({ profile, xpGoal, disabled = false, onPress }: PlayerCardProps) {
   const progress = xpGoal > 0 ? Math.min(1, profile.xp / xpGoal) : 0;
+  const accessibilityLabel = `Открыть профиль, ${profile.nickname}, уровень ${profile.level}, опыт ${profile.xp} из ${xpGoal} XP`;
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel="Открыть профиль"
+      accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [styles.card, pressed && styles.pressed, disabled && styles.disabled]}>
-      <View style={styles.avatar} accessible accessibilityRole="image" accessibilityLabel="Нейтральный аватар">
+      <View style={styles.avatar}>
         <View style={styles.avatarMark} />
       </View>
       <View style={styles.details}>
         <Text style={styles.nickname}>{profile.nickname}</Text>
         <Text style={styles.level}>Уровень {profile.level}</Text>
-        <View
-          style={styles.progressTrack}
-          accessibilityRole="progressbar"
-          accessibilityLabel="Прогресс опыта"
-          accessibilityValue={{ min: 0, max: xpGoal, now: profile.xp }}>
+        <View style={styles.progressTrack}>
           <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
         </View>
         <Text style={styles.xp}>{profile.xp} / {xpGoal} XP</Text>

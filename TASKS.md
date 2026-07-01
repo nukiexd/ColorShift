@@ -6,7 +6,7 @@ Last updated: 1 July 2026
 
 Active branch: feature/endless-mvp
 
-Current focus: Task 4 verified checkpoint; Task 5 not started
+Current focus: Task 5 quality-review fixes in progress; implementation and specification review complete
 
 ## Status
 
@@ -38,11 +38,11 @@ Current focus: Task 4 verified checkpoint; Task 5 not started
 
 ## Task 5 preview
 
-- [ ] Persist the Color Shift design system
-- [ ] Add semantic tokens and Manrope app shell
-- [ ] Build home, player card, mode picker, profile sheet, settings sheet, and confirmation sheet
-- [ ] Keep Endless enabled and mark Time Attack/Demining as “Скоро”
-- [ ] Add home-flow and accessibility tests
+- [x] Persist the Color Shift design system
+- [x] Add semantic tokens and Manrope app shell
+- [x] Build home, player card, mode picker, profile sheet, settings sheet, and confirmation sheet
+- [x] Keep Endless enabled and mark Time Attack/Demining as “Скоро”
+- [x] Add home-flow and accessibility tests
 - [ ] Pass specification and quality review
 
 ## Task 6 preview

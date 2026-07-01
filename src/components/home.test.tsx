@@ -1,20 +1,10 @@
 import { fireEvent, render, screen, within } from '@testing-library/react-native';
+import { Text } from 'react-native';
 
 import HomeScreen from '@/app/index';
+import { SheetFrame } from '@/components/sheets/SheetFrame';
 import { AppContextValue, useApp } from '@/state/AppProvider';
 
-jest.mock('@/components/animated-icon', () => ({ AnimatedIcon: () => null }));
-jest.mock('@/components/hint-row', () => ({ HintRow: () => null }));
-jest.mock('@/components/themed-text', () => {
-  const { Text } = jest.requireActual('react-native');
-  return { ThemedText: ({ children }: { children?: React.ReactNode }) => <Text>{children}</Text> };
-});
-jest.mock('@/components/themed-view', () => {
-  const { View } = jest.requireActual('react-native');
-  return { ThemedView: ({ children }: { children?: React.ReactNode }) => <View>{children}</View> };
-});
-jest.mock('@/components/web-badge', () => ({ WebBadge: () => null }));
-jest.mock('@/constants/theme', () => ({ BottomTabInset: 0, MaxContentWidth: 500, Spacing: { three: 12, four: 16 } }));
 jest.mock('@/state/AppProvider', () => ({
   useApp: jest.fn(),
 }));
@@ -56,12 +46,41 @@ describe('home flows', () => {
     expect(screen.getByRole('button', { name: 'Настройки' })).toBeEnabled();
   });
 
+  test('uses high-contrast navy text on the coral primary action', async () => {
+    await render(<HomeScreen />);
+
+    const button = screen.getByRole('button', { name: 'Новая игра' });
+    expect(within(button).getByText('Новая игра')).toHaveStyle({ color: '#071426' });
+  });
+
+  test('announces player identity and progress in the profile action', async () => {
+    await render(<HomeScreen />);
+
+    expect(screen.getByRole('button', {
+      name: 'Открыть профиль, Игрок, уровень 3, опыт 24 из 140 XP',
+    })).toBeOnTheScreen();
+  });
+
+  test('keeps sheets bounded, keyboard-aware, scrollable, and tap-friendly', async () => {
+    const view = await render(
+      <SheetFrame visible title="Проверка" onClose={jest.fn()}>
+        <Text>Содержимое</Text>
+      </SheetFrame>,
+    );
+
+    expect(view.getByTestId('sheet-panel')).toHaveStyle({ maxHeight: '90%' });
+    expect(view.getByTestId('sheet-keyboard-avoider')).toBeOnTheScreen();
+    const scroll = view.getByTestId('sheet-scroll');
+    expect(scroll).toHaveStyle({ flexShrink: 1 });
+    expect(scroll.props.keyboardShouldPersistTaps).toBe('handled');
+  });
+
   test('opens profile and saves a valid nickname through the provider', async () => {
     const value = appValue();
     mockedUseApp.mockReturnValue(value);
     await render(<HomeScreen />);
 
-    await fireEvent.press(screen.getByRole('button', { name: 'Открыть профиль' }));
+    await fireEvent.press(screen.getByRole('button', { name: /^Открыть профиль/ }));
     expect(screen.getByRole('image', { name: 'Аватар недоступен' })).toBeDisabled();
     await fireEvent.changeText(screen.getByLabelText('Никнейм'), '  Алиса  ');
     await fireEvent.press(screen.getByRole('button', { name: 'Сохранить никнейм' }));
@@ -73,7 +92,7 @@ describe('home flows', () => {
     mockedUseApp.mockReturnValue(appValue({ updateNickname: jest.fn(() => false) }));
     await render(<HomeScreen />);
 
-    await fireEvent.press(screen.getByRole('button', { name: 'Открыть профиль' }));
+    await fireEvent.press(screen.getByRole('button', { name: /^Открыть профиль/ }));
     await fireEvent.changeText(screen.getByLabelText('Никнейм'), 'x');
     await fireEvent.press(screen.getByRole('button', { name: 'Сохранить никнейм' }));
 
@@ -163,7 +182,7 @@ describe('home flows', () => {
 
     expect(screen.getByRole('button', { name: 'Новая игра' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Настройки' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Открыть профиль' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /^Открыть профиль/ })).toBeDisabled();
     expect(screen.queryByRole('button', { name: 'Продолжить' })).not.toBeOnTheScreen();
     expect(screen.getByText('Загрузка…')).toBeOnTheScreen();
   });
@@ -171,6 +190,6 @@ describe('home flows', () => {
   test('uses a preferred 48 point target for core controls', async () => {
     await render(<HomeScreen />);
     expect(screen.getByRole('button', { name: 'Новая игра' })).toHaveStyle({ minHeight: 48 });
-    expect(screen.getByRole('button', { name: 'Открыть профиль' })).toHaveStyle({ minHeight: 48 });
+    expect(screen.getByRole('button', { name: /^Открыть профиль/ })).toHaveStyle({ minHeight: 48 });
   });
 });
