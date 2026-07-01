@@ -6,7 +6,7 @@ Last updated: 1 July 2026
 
 Active branch: feature/endless-mvp
 
-Current focus: Task 5 quality-review fixes in progress; implementation and specification review complete
+Current focus: Task 5 verified checkpoint; Task 6 not started
 
 ## Status
 
@@ -15,7 +15,7 @@ Current focus: Task 5 quality-review fixes in progress; implementation and speci
 - [x] Task 2 — implement board generation, matching, and legal moves
 - [x] Task 3 — implement cascades, specials, scoring, animation snapshots, and safe shuffle
 - [x] Task 4 — finish session, persistence, progression, and provider concurrency review
-- [ ] Task 5 — build the design system, home screen, profile, settings, and mode picker
+- [x] Task 5 — build the design system, home screen, profile, settings, and mode picker
 - [ ] Task 6 — build the animated board, tap controls, tracked directional gestures, and adaptive background
 - [ ] Task 7 — add pause, results, session restore, sound effects, and haptics
 - [ ] Task 8 — complete accessibility, device QA, documentation, and release verification
@@ -36,14 +36,14 @@ Current focus: Task 5 quality-review fixes in progress; implementation and speci
 - [x] Pass quality review with no Critical or Important findings
 - [x] Update docs/InProgress.md and push the verified checkpoint
 
-## Task 5 preview
+## Task 5 completed
 
 - [x] Persist the Color Shift design system
 - [x] Add semantic tokens and Manrope app shell
 - [x] Build home, player card, mode picker, profile sheet, settings sheet, and confirmation sheet
 - [x] Keep Endless enabled and mark Time Attack/Demining as “Скоро”
 - [x] Add home-flow and accessibility tests
-- [ ] Pass specification and quality review
+- [x] Pass specification and quality review
 
 ## Task 6 preview
 
