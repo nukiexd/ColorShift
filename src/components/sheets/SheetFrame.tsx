@@ -14,13 +14,15 @@ export function SheetFrame({ visible, title, onClose, alert = false, children }:
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.backdrop}>
-        <View
-          style={styles.sheet}
-          accessible={alert}
-          accessibilityRole={alert ? 'alert' : undefined}
-          accessibilityLabel={alert ? title : undefined}>
+        <View style={styles.sheet}>
           <View style={styles.heading}>
-            <Text style={styles.title}>{title}</Text>
+            <Text
+              style={styles.title}
+              accessible={alert}
+              accessibilityRole={alert ? 'alert' : undefined}
+              accessibilityLabel={alert ? title : undefined}>
+              {title}
+            </Text>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Закрыть"

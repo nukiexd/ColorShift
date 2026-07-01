@@ -54,6 +54,7 @@ function SettingSwitch({ label, value, onValueChange }: { label: string; value: 
         accessibilityLabel={label}
         value={value}
         onValueChange={onValueChange}
+        style={styles.switchTarget}
         trackColor={{ false: colors.background, true: colors.mint }}
         thumbColor={colors.text}
       />
@@ -78,5 +79,6 @@ const styles = StyleSheet.create({
   },
   pressed: { opacity: 0.7, borderColor: colors.focus },
   disabled: { opacity: 0.4 },
+  switchTarget: { minWidth: controlSize, minHeight: controlSize },
   stepperText: { color: colors.text, fontFamily: typography.semibold, fontSize: 24 },
 });

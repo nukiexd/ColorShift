@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen, within } from '@testing-library/react-native';
 
 import HomeScreen from '@/app/index';
 import { AppContextValue, useApp } from '@/state/AppProvider';
@@ -91,6 +91,18 @@ describe('home flows', () => {
     expect(screen.getAllByText('Скоро')).toHaveLength(2);
   });
 
+  test('starts Endless once and closes the mode sheet without an active session', async () => {
+    const value = appValue();
+    mockedUseApp.mockReturnValue(value);
+    await render(<HomeScreen />);
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Новая игра' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Бесконечный' }));
+
+    expect(value.startGame).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText('Режим игры')).not.toBeOnTheScreen();
+  });
+
   test('updates volume, haptics, and reduced motion from settings', async () => {
     const value = appValue();
     mockedUseApp.mockReturnValue(value);
@@ -106,6 +118,25 @@ describe('home flows', () => {
     expect(value.updateSettings).toHaveBeenNthCalledWith(3, { reducedMotion: true });
   });
 
+  test('gives native settings switches a 48 point interactive target', async () => {
+    await render(<HomeScreen />);
+    await fireEvent.press(screen.getByRole('button', { name: 'Настройки' }));
+
+    expect(screen.getByRole('switch', { name: 'Тактильный отклик' })).toHaveStyle({ minWidth: 48, minHeight: 48 });
+    expect(screen.getByRole('switch', { name: 'Уменьшение движения' })).toHaveStyle({ minWidth: 48, minHeight: 48 });
+  });
+
+  test('continues the active session once', async () => {
+    const activeSession = { phase: 'idle' } as AppContextValue['activeSession'];
+    const value = appValue({ activeSession });
+    mockedUseApp.mockReturnValue(value);
+    await render(<HomeScreen />);
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Продолжить' }));
+
+    expect(value.continueGame).toHaveBeenCalledTimes(1);
+  });
+
   test('shows Continue and confirms replacing an active session', async () => {
     const activeSession = { phase: 'idle' } as AppContextValue['activeSession'];
     const value = appValue({ activeSession });
@@ -116,7 +147,11 @@ describe('home flows', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Новая игра' }));
     await fireEvent.press(screen.getByRole('button', { name: 'Бесконечный' }));
     expect(value.discardAndStart).not.toHaveBeenCalled();
-    expect(screen.getByRole('alert', { name: 'Начать заново?' })).toBeOnTheScreen();
+    const alert = screen.getByRole('alert', { name: 'Начать заново?' });
+    expect(alert).toBeOnTheScreen();
+    expect(within(alert).queryAllByRole('button')).toHaveLength(0);
+    expect(screen.getByRole('button', { name: 'Отмена' })).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Начать заново' })).toBeOnTheScreen();
 
     await fireEvent.press(screen.getByRole('button', { name: 'Начать заново' }));
     expect(value.discardAndStart).toHaveBeenCalledTimes(1);
