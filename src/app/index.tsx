@@ -1,98 +1,101 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
+import { useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { PlayerCard } from '@/components/PlayerCard';
+import { PrimaryButton } from '@/components/PrimaryButton';
+import { ConfirmSheet } from '@/components/sheets/ConfirmSheet';
+import { ModeSheet } from '@/components/sheets/ModeSheet';
+import { ProfileSheet } from '@/components/sheets/ProfileSheet';
+import { SettingsSheet } from '@/components/sheets/SettingsSheet';
+import { xpRequiredForLevel } from '@/game/session';
+import { useApp } from '@/state/AppProvider';
+import { colors, spacing, typography } from '@/ui/tokens';
 
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
-  return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
-  );
-}
+type OpenSheet = 'mode' | 'profile' | 'settings' | 'confirm' | null;
 
 export default function HomeScreen() {
+  const app = useApp();
+  const [openSheet, setOpenSheet] = useState<OpenSheet>(null);
+  const disabled = !app.hydrated;
+
+  const chooseEndless = () => {
+    setOpenSheet(app.activeSession ? 'confirm' : null);
+    if (!app.activeSession) app.startGame();
+  };
+
+  const replaceSession = () => {
+    app.discardAndStart();
+    setOpenSheet(null);
+  };
+
   return (
-    <ThemedView style={styles.container}>
+    <View style={styles.screen}>
       <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
-          </ThemedText>
-        </ThemedView>
+        <View style={styles.header}>
+          <View style={styles.titleMark} />
+          <Text style={styles.title}>COLOR SHIFT</Text>
+          <Text style={styles.subtitle}>Собирайте цвета в своём ритме</Text>
+        </View>
 
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
+        <PlayerCard
+          profile={app.profile}
+          xpGoal={xpRequiredForLevel(app.profile.level)}
+          disabled={disabled}
+          onPress={() => setOpenSheet('profile')}
+        />
 
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
+        <View style={styles.actions}>
+          {!app.loading && app.activeSession && (
+            <PrimaryButton label="Продолжить" onPress={() => { app.continueGame(); }} disabled={disabled} />
+          )}
+          <PrimaryButton
+            label="Новая игра"
+            variant={app.activeSession ? 'secondary' : 'primary'}
+            disabled={disabled}
+            onPress={() => setOpenSheet('mode')}
           />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
-
-        {Platform.OS === 'web' && <WebBadge />}
+          <PrimaryButton label="Настройки" variant="quiet" disabled={disabled} onPress={() => setOpenSheet('settings')} />
+          {app.loading && <Text accessibilityRole="text" style={styles.loading}>Загрузка…</Text>}
+        </View>
       </SafeAreaView>
-    </ThemedView>
+
+      <ModeSheet visible={openSheet === 'mode'} onClose={() => setOpenSheet(null)} onEndless={chooseEndless} />
+      {openSheet === 'profile' && (
+        <ProfileSheet
+          visible
+          profile={app.profile}
+          onClose={() => setOpenSheet(null)}
+          onSave={app.updateNickname}
+        />
+      )}
+      <SettingsSheet
+        visible={openSheet === 'settings'}
+        settings={app.settings}
+        onClose={() => setOpenSheet(null)}
+        onUpdate={app.updateSettings}
+      />
+      <ConfirmSheet visible={openSheet === 'confirm'} onCancel={() => setOpenSheet(null)} onConfirm={replaceSession} />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
-  },
+  screen: { flex: 1, backgroundColor: colors.background },
   safeArea: {
     flex: 1,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
+    width: '100%',
+    maxWidth: 520,
+    alignSelf: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+    justifyContent: 'space-between',
+    gap: spacing.lg,
   },
-  heroSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
-  },
-  title: {
-    textAlign: 'center',
-  },
-  code: {
-    textTransform: 'uppercase',
-  },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
-  },
+  header: { alignItems: 'center', gap: spacing.sm, paddingTop: spacing.lg },
+  titleMark: { width: 36, height: 8, borderRadius: 4, backgroundColor: colors.coral },
+  title: { color: colors.text, fontFamily: typography.bold, fontSize: 32, letterSpacing: 2.5 },
+  subtitle: { color: colors.textMuted, fontFamily: typography.regular, fontSize: 14, textAlign: 'center' },
+  actions: { gap: spacing.sm, paddingBottom: spacing.md },
+  loading: { color: colors.textMuted, fontFamily: typography.regular, textAlign: 'center', minHeight: 20 },
 });
