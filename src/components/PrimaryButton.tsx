@@ -48,7 +48,7 @@ const styles = StyleSheet.create({
   primary: { backgroundColor: colors.coral },
   secondary: { backgroundColor: colors.surfaceRaised, borderColor: colors.sky },
   quiet: { backgroundColor: 'transparent', borderColor: colors.textMuted },
-  pressed: { opacity: 0.72, borderColor: colors.focus },
+  pressed: { borderColor: colors.focus },
   disabled: { opacity: 0.42 },
   label: { color: colors.text, fontFamily: typography.semibold, fontSize: 16 },
   primaryLabel: { color: colors.background },

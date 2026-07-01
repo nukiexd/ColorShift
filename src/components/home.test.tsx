@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, within } from '@testing-library/react-native';
-import { Text } from 'react-native';
+import { StyleSheet, Text } from 'react-native';
 
 import HomeScreen from '@/app/index';
 import { SheetFrame } from '@/components/sheets/SheetFrame';
@@ -50,6 +50,22 @@ describe('home flows', () => {
     await render(<HomeScreen />);
 
     const button = screen.getByRole('button', { name: 'Новая игра' });
+    expect(within(button).getByText('Новая игра')).toHaveStyle({ color: '#071426' });
+  });
+
+  test('preserves primary contrast and uses a solid border cue while pressed', async () => {
+    await render(<HomeScreen />);
+    const button = screen.getByRole('button', { name: 'Новая игра' });
+
+    await fireEvent(button, 'responderGrant', {
+      persist: jest.fn(),
+      currentTarget: 1,
+      target: 1,
+      nativeEvent: { timestamp: 0, touches: [], changedTouches: [] },
+    });
+
+    expect(StyleSheet.flatten(button.props.style).opacity).toBeUndefined();
+    expect(button).toHaveStyle({ backgroundColor: '#D96B68', borderColor: '#DCE8F7' });
     expect(within(button).getByText('Новая игра')).toHaveStyle({ color: '#071426' });
   });
 
