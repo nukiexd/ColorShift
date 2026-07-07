@@ -1,98 +1,144 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
+import { useState } from 'react';
+import { Href, useRouter } from 'expo-router';
+import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { PlayerCard } from '../components/PlayerCard';
+import { PrimaryButton } from '../components/PrimaryButton';
+import { ConfirmSheet } from '../components/sheets/ConfirmSheet';
+import { ModeSheet } from '../components/sheets/ModeSheet';
+import { ProfileSheet } from '../components/sheets/ProfileSheet';
+import { SettingsSheet } from '../components/sheets/SettingsSheet';
+import { useApp } from '../state/AppProvider';
+import { colors, radii, spacing, typography } from '../ui/tokens';
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
-  return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
-  );
-}
+type ActiveSheet = 'mode' | 'profile' | 'settings' | 'replace' | null;
+const GAME_ROUTE = '/game' as Href;
 
 export default function HomeScreen() {
+  const app = useApp();
+  const router = useRouter();
+  const [activeSheet, setActiveSheet] = useState<ActiveSheet>(null);
+  const hasSession = app.activeSession !== null;
+
+  const startEndless = () => {
+    app.startGame();
+    setActiveSheet(null);
+    router.push(GAME_ROUTE);
+  };
+
+  const replaceSession = () => {
+    app.discardAndStart();
+    setActiveSheet(null);
+    router.push(GAME_ROUTE);
+  };
+
   return (
-    <ThemedView style={styles.container}>
+    <View style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
-          </ThemedText>
-        </ThemedView>
+        <PlayerCard profile={app.profile} onPress={() => setActiveSheet('profile')} />
 
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
+        <View style={styles.hero}>
+          <Text style={styles.eyebrow}>спокойная головоломка</Text>
+          <Text style={styles.title}>COLOR SHIFT</Text>
+          <Text style={styles.subtitle}>Собирай мягкие цветовые цепочки, запускай каскады и играй в своём темпе.</Text>
+        </View>
 
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
+        <View style={styles.actions}>
+          {hasSession ? <PrimaryButton label="Продолжить" onPress={() => router.push(GAME_ROUTE)} /> : null}
+          <PrimaryButton
+            label="Новая игра"
+            variant={hasSession ? 'secondary' : 'primary'}
+            onPress={() => setActiveSheet(hasSession ? 'replace' : 'mode')}
+            disabled={!app.hydrated}
           />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
+          <PrimaryButton label="Настройки" variant="ghost" onPress={() => setActiveSheet('settings')} disabled={!app.hydrated} />
+        </View>
 
-        {Platform.OS === 'web' && <WebBadge />}
+        <View style={styles.progressDock}>
+          <Text style={styles.progressTitle}>Твой прогресс</Text>
+          <Text style={styles.progressValue}>Уровень {app.profile.level}</Text>
+          <Text style={styles.progressMuted}>Лучший счёт: {app.profile.bestScore}</Text>
+        </View>
       </SafeAreaView>
-    </ThemedView>
+
+      {activeSheet === 'mode' ? <ModeSheet onClose={() => setActiveSheet(null)} onStartEndless={startEndless} /> : null}
+      {activeSheet === 'profile' ? <ProfileSheet profile={app.profile} onClose={() => setActiveSheet(null)} onSave={app.updateNickname} /> : null}
+      {activeSheet === 'settings' ? <SettingsSheet settings={app.settings} onClose={() => setActiveSheet(null)} onUpdate={app.updateSettings} /> : null}
+      {activeSheet === 'replace' ? (
+        <ConfirmSheet
+          title="Начать заново?"
+          message="Текущая сохранённая партия будет заменена новой Endless-сессией."
+          confirmLabel="Начать новую"
+          onCancel={() => setActiveSheet(null)}
+          onConfirm={replaceSession}
+        />
+      ) : null}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
+    backgroundColor: colors.background,
   },
   safeArea: {
     flex: 1,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    gap: spacing.lg,
   },
-  heroSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
+  hero: {
     flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
+    justifyContent: 'center',
+    gap: spacing.md,
   },
-  title: {
-    textAlign: 'center',
-  },
-  code: {
+  eyebrow: {
+    color: colors.mint,
+    fontFamily: typography.family,
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 1.8,
     textTransform: 'uppercase',
   },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
+  title: {
+    color: colors.text,
+    fontFamily: typography.family,
+    fontSize: 42,
+    fontWeight: '900',
+    letterSpacing: typography.titleSpacing,
+  },
+  subtitle: {
+    maxWidth: 340,
+    color: colors.textMuted,
+    fontFamily: typography.family,
+    fontSize: 16,
+    lineHeight: 24,
+  },
+  actions: {
+    gap: spacing.sm,
+  },
+  progressDock: {
+    borderRadius: radii.card,
+    padding: spacing.md,
+    gap: spacing.xs,
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderWidth: 1,
+  },
+  progressTitle: {
+    color: colors.textMuted,
+    fontFamily: typography.family,
+    fontSize: 13,
+  },
+  progressValue: {
+    color: colors.text,
+    fontFamily: typography.family,
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  progressMuted: {
+    color: colors.textSubtle,
+    fontFamily: typography.family,
   },
 });

@@ -1,4 +1,5 @@
 import { createBoard } from './board';
+import { MAX_LEVEL, MAX_SCORE, MAX_XP } from './balance';
 import { Board, Coord, TileColor } from './model';
 import { createSeededRandom, createTileIdSource } from './random';
 import { resolveMove } from './resolve';
@@ -6,6 +7,7 @@ import { resolveMove } from './resolve';
 export type SessionPhase = 'idle' | 'preview' | 'swapping' | 'clearing' | 'falling' | 'shuffling' | 'paused';
 
 export interface GameSession {
+  readonly sessionId: string;
   readonly board: Board;
   readonly score: number;
   readonly bestCascade: number;
@@ -22,10 +24,13 @@ export interface LevelProgress {
   readonly xp: number;
 }
 
-export function createSession(seed = 0): GameSession {
+export function createSession(seed = 0, ordinal = 0): GameSession {
   const random = createSeededRandom(seed);
   const board = createBoard(random);
+  const seedId = seed >>> 0;
+  const ordinalId = Math.max(0, Math.trunc(ordinal)) >>> 0;
   return {
+    sessionId: `session-${seedId}-${ordinalId}`,
     board,
     score: 0,
     bestCascade: 0,
@@ -34,7 +39,7 @@ export function createSession(seed = 0): GameSession {
     phase: 'idle',
     randomState: random.getState(),
     tileIdCounter: 0,
-    tileIdNamespace: `session-${seed >>> 0}`,
+    tileIdNamespace: `session-${seedId}-${ordinalId}`,
   };
 }
 
@@ -60,19 +65,31 @@ export function commitMove(session: GameSession, from: Coord, to: Coord): GameSe
 
 export function xpForScore(score: number): number {
   if (!Number.isFinite(score) || score <= 0) return 0;
-  return Math.floor(10 * Math.sqrt(score / 1000));
+  return Math.floor(10 * Math.sqrt(Math.min(Math.trunc(score), MAX_SCORE) / 1000));
 }
 
 export function xpRequiredForLevel(level: number): number {
-  return 100 + 20 * (Math.max(1, Math.trunc(level)) - 1);
+  return 100 + 20 * (Math.min(MAX_LEVEL, Math.max(1, Math.trunc(level))) - 1);
 }
 
 export function applyXp(progress: LevelProgress, earned: number): LevelProgress {
-  let level = Math.max(1, Math.trunc(progress.level));
-  let xp = Math.max(0, Math.trunc(progress.xp)) + Math.max(0, Math.trunc(earned));
-  while (xp >= xpRequiredForLevel(level)) {
+  const normalized = normalizeProgress(progress);
+  if (!Number.isFinite(earned) || earned <= 0) return normalized;
+
+  let level = normalized.level;
+  let xp = normalized.xp + Math.min(Math.trunc(earned), MAX_XP);
+  while (level < MAX_LEVEL && xp >= xpRequiredForLevel(level)) {
     xp -= xpRequiredForLevel(level);
     level += 1;
   }
+  if (level >= MAX_LEVEL) {
+    return { level: MAX_LEVEL, xp: Math.min(xp, MAX_XP) };
+  }
+  return { level, xp };
+}
+
+function normalizeProgress(progress: LevelProgress): LevelProgress {
+  const level = Number.isFinite(progress.level) ? Math.min(MAX_LEVEL, Math.max(1, Math.trunc(progress.level))) : 1;
+  const xp = Number.isFinite(progress.xp) ? Math.min(MAX_XP, Math.max(0, Math.trunc(progress.xp))) : 0;
   return { level, xp };
 }

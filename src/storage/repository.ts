@@ -3,6 +3,8 @@ import { createDefaultState, parsePersistedState, PersistedState } from './schem
 
 export const STORAGE_KEY = 'color-shift/state/v1';
 
+let saveQueue = Promise.resolve();
+
 export async function loadState(): Promise<PersistedState> {
   try {
     const serialized = await AsyncStorage.getItem(STORAGE_KEY);
@@ -14,11 +16,15 @@ export async function loadState(): Promise<PersistedState> {
 }
 
 export async function saveState(state: unknown): Promise<boolean> {
-  try {
-    const safe = parsePersistedState(state);
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(safe));
-    return true;
-  } catch {
-    return false;
-  }
+  const write = saveQueue.then(async () => {
+    try {
+      const safe = parsePersistedState(state);
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(safe));
+      return true;
+    } catch {
+      return false;
+    }
+  });
+  saveQueue = write.then(() => undefined, () => undefined);
+  return write;
 }

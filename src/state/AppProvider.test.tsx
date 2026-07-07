@@ -112,4 +112,71 @@ describe('AppProvider', () => {
     expect(lastSaved.profile.nickname).toBe('1234567890123456');
     expect(lastSaved.settings).toEqual({ effectsVolume: 0, haptics: false, reducedMotion: true });
   });
+
+  test('blocks mutations before hydration applies loaded state', async () => {
+    let releaseLoad!: (value: string) => void;
+    storage.getItem.mockReturnValueOnce(new Promise((resolve) => { releaseLoad = resolve; }));
+    const wrapper = ({ children }: PropsWithChildren) => <AppProvider seedFactory={() => 7}>{children}</AppProvider>;
+    const { result } = await renderHook(() => useApp(), { wrapper });
+
+    let started;
+    await act(() => {
+      started = result.current.startGame();
+      expect(result.current.updateNickname('Лиса')).toBe(false);
+      result.current.updateSettings({ effectsVolume: 1 });
+    });
+    expect(started).toBeNull();
+    expect(result.current.activeSession).toBeNull();
+    expect(result.current.profile.nickname).toBe(createDefaultState().profile.nickname);
+    expect(result.current.settings.effectsVolume).toBe(0.35);
+
+    await act(async () => {
+      releaseLoad(JSON.stringify(createDefaultState()));
+    });
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+    expect(result.current.activeSession).toBeNull();
+    await waitFor(() => expect(storage.setItem).toHaveBeenCalled());
+    const saved = JSON.parse(storage.setItem.mock.calls.at(-1)![1]);
+    expect(saved.profile.nickname).toBe(createDefaultState().profile.nickname);
+    expect(saved.settings.effectsVolume).toBe(0.35);
+    expect(saved.activeSession).toBeNull();
+  });
+
+  test('linearizes same-tick finish so XP is awarded once', async () => {
+    const wrapper = ({ children }: PropsWithChildren) => <AppProvider seedFactory={() => 7}>{children}</AppProvider>;
+    const { result } = await renderHook(() => useApp(), { wrapper });
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+    await act(() => { result.current.startGame(); });
+    await act(() => { result.current.settleSession({ ...result.current.activeSession!, score: 1000 }); });
+
+    let first;
+    let second;
+    await act(() => {
+      first = result.current.finishGame();
+      second = result.current.finishGame();
+    });
+
+    expect(first).toMatchObject({ xpEarned: 10 });
+    expect(second).toBeNull();
+    expect(result.current.profile.xp).toBe(10);
+    expect(result.current.activeSession).toBeNull();
+  });
+
+  test('rejects stale settlement after replacement session starts', async () => {
+    const seedFactory = jest.fn().mockReturnValueOnce(7).mockReturnValueOnce(8);
+    const wrapper = ({ children }: PropsWithChildren) => <AppProvider seedFactory={seedFactory}>{children}</AppProvider>;
+    const { result } = await renderHook(() => useApp(), { wrapper });
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+    await act(() => { result.current.startGame(); });
+    const stale = result.current.activeSession!;
+    let replacement;
+    await act(() => { replacement = result.current.discardAndStart(); });
+
+    await act(() => {
+      expect(result.current.settleSession({ ...stale, score: 9999 })).toBe(false);
+    });
+
+    expect(result.current.activeSession).toBe(replacement);
+    expect(result.current.activeSession?.score).toBe(0);
+  });
 });

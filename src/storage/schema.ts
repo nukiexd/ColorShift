@@ -1,6 +1,8 @@
-import { BOARD_SIZE, TILE_COLORS } from '../game/balance';
+import { findLegalMoves } from '../game/board';
+import { BOARD_SIZE, MAX_LEVEL, MAX_SCORE, MAX_TILE_ID_COUNTER, MAX_XP, TILE_COLORS } from '../game/balance';
+import { findMatches } from '../game/matches';
 import { GameSession } from '../game/session';
-import { Special, TileColor } from '../game/model';
+import { Board, Special, TileColor } from '../game/model';
 
 export interface Profile {
   readonly nickname: string;
@@ -52,7 +54,9 @@ export function clampVolume(value: number): number {
 function parseProfile(value: unknown): Profile | null {
   if (!isRecord(value) || typeof value.nickname !== 'string') return null;
   const nickname = normalizeNickname(value.nickname);
-  if (!nickname || !isPositiveInteger(value.level) || !isNonnegativeInteger(value.xp) || !isNonnegativeInteger(value.bestScore)) return null;
+  if (!nickname || !isPositiveInteger(value.level) || value.level > MAX_LEVEL
+    || !isNonnegativeInteger(value.xp) || value.xp > MAX_XP
+    || !isNonnegativeInteger(value.bestScore) || value.bestScore > MAX_SCORE) return null;
   return { nickname, level: value.level, xp: value.xp, bestScore: value.bestScore };
 }
 
@@ -64,10 +68,14 @@ function parseSettings(value: unknown): Settings | null {
 
 function parseSession(value: unknown): GameSession | null {
   if (!isRecord(value) || (value.phase !== 'idle' && value.phase !== 'paused') || !isBoard(value.board)
-    || !isNonnegativeInteger(value.score) || !isNonnegativeInteger(value.bestCascade) || !isNonnegativeInteger(value.clearedTiles)
+    || typeof value.sessionId !== 'string' || value.sessionId.length === 0
+    || !isNonnegativeInteger(value.score) || value.score > MAX_SCORE
+    || !isNonnegativeInteger(value.bestCascade) || !isNonnegativeInteger(value.clearedTiles)
     || (value.backgroundColor !== null && !isTileColor(value.backgroundColor))
-    || !isUint32(value.randomState) || !isNonnegativeInteger(value.tileIdCounter)
+    || !isUint32(value.randomState) || !isNonnegativeInteger(value.tileIdCounter) || value.tileIdCounter >= MAX_TILE_ID_COUNTER
     || typeof value.tileIdNamespace !== 'string' || value.tileIdNamespace.length === 0) return null;
+  const board = value.board as Board;
+  if (findMatches(board).length > 0 || findLegalMoves(board).length === 0) return null;
   return value as unknown as GameSession;
 }
 

@@ -2,11 +2,11 @@
 
 This is the concise project checklist. Detailed subtasks, review gates, and verification history live in [docs/InProgress.md](docs/InProgress.md).
 
-Last updated: 30 June 2026
+Last updated: 8 July 2026
 
 Active branch: feature/endless-mvp
 
-Current focus: Task 4 quality fixes
+Current focus: Task 6 board and gestures
 
 ## Status
 
@@ -24,35 +24,35 @@ Current focus: Task 4 quality fixes
 
 - [x] Implement GameSession, XP, profile, settings, schema, repository, and AppProvider
 - [x] Pass specification review
-- [ ] Bound persisted numeric values and guarantee allocator termination
-- [ ] Make provider actions linearizable in the same event-loop turn
-- [ ] Add session identity and reject stale settlement
-- [ ] Block mutations before hydration completes
-- [ ] Reject or recover non-playable restored boards
-- [ ] Serialize persistence writes so the latest state wins
+- [x] Bound persisted numeric values and guarantee allocator termination
+- [x] Make provider actions linearizable in the same event-loop turn
+- [x] Add session identity and reject stale settlement
+- [x] Block mutations before hydration completes
+- [x] Reject or recover non-playable restored boards
+- [x] Serialize persistence writes so the latest state wins
 - [x] Add failing numeric-limit, write-order, and dead-board regression tests
-- [ ] Add the remaining provider concurrency and hydration regression tests
-- [ ] Pass full tests, typecheck, and lint
+- [x] Add the remaining provider concurrency and hydration regression tests
+- [x] Pass full tests, typecheck, and lint
 - [ ] Pass quality review with no Critical or Important findings
 - [ ] Update docs/InProgress.md and push the verified checkpoint
 
 ## Task 5 preview
 
-- [ ] Persist the Color Shift design system
-- [ ] Add semantic tokens and Manrope app shell
-- [ ] Build home, player card, mode picker, profile sheet, settings sheet, and confirmation sheet
-- [ ] Keep Endless enabled and mark Time Attack/Demining as “Скоро”
-- [ ] Add home-flow and accessibility tests
+- [x] Persist the Color Shift design system
+- [x] Add semantic tokens and Manrope app shell
+- [x] Build home, player card, mode picker, profile sheet, settings sheet, and confirmation sheet
+- [x] Keep Endless enabled and mark Time Attack/Demining as “Скоро”
+- [x] Add home-flow and accessibility tests
 - [ ] Pass specification and quality review
 
 ## Task 6 preview
 
-- [ ] Render a responsive 6×6 board with tiles up to 56×56
-- [ ] Add tap selection and adjacent-tap swaps
-- [ ] Add stationary-tile directional tracking with 32% preview and 24% cancel thresholds
+- [x] Render a responsive 6×6 board with tiles up to 56×56
+- [x] Add tap selection and adjacent-tap swaps
+- [x] Add stationary-tile directional tracking with 32% preview and 24% cancel thresholds
 - [ ] Animate swap, clear, gravity, refill, cascade, and shuffle phases
-- [ ] Add adaptive background glow and reduced motion
-- [ ] Add gesture, controller, and accessibility tests
+- [x] Add adaptive background glow and reduced motion
+- [x] Add gesture, controller, and accessibility tests
 - [ ] Pass specification and quality review
 
 ## Task 7 preview
