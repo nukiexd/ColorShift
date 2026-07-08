@@ -1,11 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
-import { tileAccessibilityLabel } from '../components/Tile';
+import GameScreen from '../app/game';
+import { tileAccessibilityLabel } from './Tile';
 import { findLegalMoves } from '../game/board';
 import { createSession } from '../game/session';
 import { AppProvider } from '../state/AppProvider';
 import { createDefaultState } from '../storage/schema';
-import GameScreen from './game';
 
 jest.mock('@react-native-async-storage/async-storage', () => ({ getItem: jest.fn(), setItem: jest.fn() }));
 const storage = AsyncStorage as jest.Mocked<typeof AsyncStorage>;
