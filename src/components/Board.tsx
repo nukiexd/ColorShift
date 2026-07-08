@@ -1,5 +1,5 @@
-import { useLayoutEffect, useRef, useState } from 'react';
-import { Animated, Easing, PanResponder, StyleSheet, View } from 'react-native';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Animated, Easing, GestureResponderHandlers, PanResponder, Platform, StyleSheet, View, ViewStyle } from 'react-native';
 import { Board, Coord, Tile } from '../game/model';
 import { GameSession } from '../game/session';
 import { MoveAnimationPlan, AnimationStep, previewOffsets } from '../hooks/animationPlan';
@@ -39,6 +39,25 @@ export function calculateBoardLayout(width: number): BoardLayout {
   return { gutter, boardPadding, gap, available, tileSize, pitch, boardSize: tileSize * 6 + gap * 5 + boardPadding * 2 };
 }
 
+type WebGestureGuardStyle = ViewStyle & {
+  readonly touchAction?: 'none';
+  readonly userSelect?: 'none';
+  readonly WebkitUserSelect?: 'none';
+  readonly WebkitUserDrag?: 'none';
+  readonly draggable?: false;
+};
+
+export function boardGestureGuardStyle(platformOS: typeof Platform.OS = Platform.OS): WebGestureGuardStyle {
+  if (platformOS !== 'web') return {};
+  return {
+    touchAction: 'none',
+    userSelect: 'none',
+    WebkitUserSelect: 'none',
+    WebkitUserDrag: 'none',
+    draggable: false,
+  };
+}
+
 export function BoardView({
   session,
   width,
@@ -59,6 +78,10 @@ export function BoardView({
   const resolving = Boolean(animationPlan && animationPlan.steps.length > 0 && activeStep);
   const inputDisabled = resolving || session.phase !== 'idle';
   const board = activeStep && animationPlan ? boardForAnimationStep(session.board, animationPlan, activeStep) : session.board;
+  const panHandlersByCoord = useMemo(
+    () => createTileGestureHandlers(inputDisabled, layout.pitch, onPanMove, onPanRelease),
+    [inputDisabled, layout.pitch, onPanMove, onPanRelease],
+  );
 
   useLayoutEffect(() => {
     if (!animationPlan || !activeStep) return undefined;
@@ -86,13 +109,13 @@ export function BoardView({
   }, [activeStep, animationPlan, onAnimationPlanComplete, progress, stepIndex]);
 
   return (
-    <View style={[styles.board, { width: layout.boardSize, height: layout.boardSize, padding: layout.boardPadding }]}>
+    <View style={[styles.board, boardGestureGuardStyle(), { width: layout.boardSize, height: layout.boardSize, padding: layout.boardPadding }]}>
       {board.map((row, rowIndex) => row.map((tile, colIndex) => tile ? (
         <Animated.View
           key={tile.id}
           testID={`tile-motion-${rowIndex}-${colIndex}`}
           style={tileStyle(rowIndex, colIndex, tile, layout, preview, inputDisabled, animationPlan, activeStep, progress)}
-          {...tileGestureHandlers({ row: rowIndex, col: colIndex }, inputDisabled, layout.pitch, onPanMove, onPanRelease)}
+          {...panHandlersByCoord[rowIndex][colIndex]}
         >
           <TileView
             color={tile.color}
@@ -133,6 +156,17 @@ function tileStyle(
     transform: [{ translateX: offset.x }, { translateY: offset.y }],
     ...animated,
   };
+}
+
+function createTileGestureHandlers(
+  resolving: boolean,
+  pitch: number,
+  onPanMove?: (coord: Coord, dx: number, dy: number, pitch: number) => void,
+  onPanRelease?: () => void,
+): readonly (readonly GestureResponderHandlers[])[] {
+  return Array.from({ length: 6 }, (_, row) => (
+    Array.from({ length: 6 }, (_, col) => tileGestureHandlers({ row, col }, resolving, pitch, onPanMove, onPanRelease))
+  ));
 }
 
 function tileGestureHandlers(

@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { TILE_COLORS } from '../game/balance';
 import { Coord, Special, TileColor } from '../game/model';
@@ -21,7 +22,7 @@ interface TileViewProps {
   readonly onPress: (coord: Coord) => void;
 }
 
-export function TileView({ color, special, coord, size, selected = false, disabled = false, onPress }: TileViewProps) {
+export const TileView = memo(function TileView({ color, special, coord, size, selected = false, disabled = false, onPress }: TileViewProps) {
   const mark = specialMark(special);
   const isRainbow = special === 'rainbow';
   return (
@@ -64,7 +65,7 @@ export function TileView({ color, special, coord, size, selected = false, disabl
       ) : null}
     </Pressable>
   );
-}
+});
 
 export function tileAccessibilityLabel(color: TileColor, special: Special, coord: Coord, selected: boolean): string {
   const parts = [`Блок ${color}`, `строка ${coord.row + 1}`, `столбец ${coord.col + 1}`];

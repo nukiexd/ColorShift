@@ -332,6 +332,20 @@
 - [x] Full project verification passed: `npm.cmd test`, `npm.cmd run typecheck`, `npm.cmd run lint`, and `npx.cmd expo-doctor`.
 - [ ] Commit and push remain intentionally not performed unless the user requests them.
 
+### Swipe responsiveness and animation jank fix pass - 9 July 2026
+
+- [x] Added RED regression coverage for locked pan direction and repeated same-preview pan movement returning the same controller state.
+- [x] Added RED regression coverage for web board gesture guards that disable browser touch scroll, text selection, and drag behavior on the board surface.
+- [x] Locked pan direction after the first decisive axis choice, including dirty diagonal movement later in the same gesture.
+- [x] Added a 1.2 axis-lock ratio before first lock so ambiguous diagonal swipes do not jump between axes.
+- [x] Avoided repeated controller state churn when the pan preview is already unchanged.
+- [x] Avoided calling `setController` from the game screen when a pan move returns the existing controller state.
+- [x] Memoized the board's 6x6 pan responder handler grid for each input-lock/callback/pitch combination instead of creating responders inside every tile render.
+- [x] Switched board tile playback animations to `useNativeDriver: true` because the animated properties are transform and opacity only.
+- [x] Memoized `TileView` to reduce repeated tile renders when individual tile props do not change.
+- [x] Full verification passed for targeted affected tests, full `npm.cmd test`, `npm.cmd run typecheck`, and `npm.cmd run lint`.
+- [ ] Commit and push remain intentionally not performed unless the user requests them.
+
 ## Вне Endless MVP
 
 Эти пункты намеренно не входят в текущий цикл и не отмечаются как незавершённые задачи MVP:

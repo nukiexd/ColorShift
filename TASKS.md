@@ -6,7 +6,7 @@ Last updated: 9 July 2026
 
 Active branch: feature/endless-mvp
 
-Current focus: Final match/special/combo rule alignment
+Current focus: Swipe responsiveness and animation jank fix pass
 
 ## Status
 
@@ -76,6 +76,10 @@ Current focus: Final match/special/combo rule alignment
 - [x] Treat line-specials as colored match participants and bomb/rainbow specials as colorless for normal matches
 - [x] Add simple rainbow combos: rainbow + line clears line color and activates the line; rainbow + bomb and rainbow + rainbow clear the full board
 - [x] Keep line + line, line + bomb, and bomb + bomb as both-base-effects swaps without unique combo logic
+- [x] Lock pan swipe direction for a gesture and avoid repeated preview state updates
+- [x] Add web board gesture guards for browser scroll/select/drag conflicts
+- [x] Use native-driver tile animations where the animated properties are transform/opacity only
+- [x] Memoize board pan responder handlers and tile rendering to reduce hot-path render cost
 
 ## Task 7 preview
 

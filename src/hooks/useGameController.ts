@@ -15,6 +15,7 @@ export interface GameControllerState {
   readonly session: GameSession;
   readonly selected: Coord | null;
   readonly preview: SwapPreview | null;
+  readonly panDirection: Direction | null;
   readonly panCommitted: boolean;
 }
 
@@ -32,24 +33,27 @@ export function gestureIntent(dx: number, dy: number, pitch: number, current: Di
   if (!Number.isFinite(dx) || !Number.isFinite(dy) || !Number.isFinite(pitch) || pitch <= 0) return null;
   const distance = Math.max(Math.abs(dx), Math.abs(dy));
   if (current && distance < pitch * 0.14) return null;
+  if (current) return current;
   if (!current && distance < pitch * 0.22) return null;
-  if (Math.abs(dx) >= Math.abs(dy)) return dx < 0 ? 'left' : 'right';
-  return dy < 0 ? 'up' : 'down';
+  const axisLockRatio = 1.2;
+  if (Math.abs(dx) >= Math.abs(dy) * axisLockRatio) return dx < 0 ? 'left' : 'right';
+  if (Math.abs(dy) >= Math.abs(dx) * axisLockRatio) return dy < 0 ? 'up' : 'down';
+  return null;
 }
 
 export function createGameControllerState(session: GameSession): GameControllerState {
-  return { session, selected: null, preview: null, panCommitted: false };
+  return { session, selected: null, preview: null, panDirection: null, panCommitted: false };
 }
 
 export function tapTile(state: GameControllerState, coord: Coord, options: CommitOptions = {}): ControllerResult {
   if (!canAcceptInput(state)) return { state, accepted: false };
-  if (state.selected === null) return { state: { ...state, selected: coord, preview: null, panCommitted: false }, accepted: false };
-  if (sameCoord(state.selected, coord)) return { state: { ...state, selected: null, preview: null }, accepted: false };
-  if (!areAdjacent(state.selected, coord)) return { state: { ...state, selected: coord, preview: null }, accepted: false };
+  if (state.selected === null) return { state: { ...state, selected: coord, preview: null, panDirection: null, panCommitted: false }, accepted: false };
+  if (sameCoord(state.selected, coord)) return { state: { ...state, selected: null, preview: null, panDirection: null }, accepted: false };
+  if (!areAdjacent(state.selected, coord)) return { state: { ...state, selected: coord, preview: null, panDirection: null }, accepted: false };
   const animationPlan = buildMoveAnimationPlan(state.session, state.selected, coord, { reducedMotion: options.reducedMotion ?? false });
   const nextSession = animationPlan.accepted ? sessionFromPlan(state.session, animationPlan) : state.session;
   return {
-    state: { ...state, session: nextSession, selected: null, preview: null, panCommitted: nextSession !== state.session },
+    state: { ...state, session: nextSession, selected: null, preview: null, panDirection: null, panCommitted: nextSession !== state.session },
     accepted: nextSession !== state.session,
     animationPlan,
   };
@@ -57,21 +61,33 @@ export function tapTile(state: GameControllerState, coord: Coord, options: Commi
 
 export function updatePan(state: GameControllerState, from: Coord, dx: number, dy: number, pitch: number): GameControllerState {
   if (!canAcceptInput(state) || state.panCommitted) return state;
-  const currentDirection = state.preview ? directionBetween(state.preview.from, state.preview.to) : null;
-  const direction = gestureIntent(dx, dy, pitch, currentDirection);
-  if (!direction) return { ...state, selected: from, preview: null };
+  const direction = gestureIntent(dx, dy, pitch, state.panDirection);
+  if (!direction) {
+    if (state.selected && sameCoord(state.selected, from) && state.preview === null && state.panDirection === null) return state;
+    return { ...state, selected: from, preview: null };
+  }
   const to = neighbor(from, direction);
-  if (!isBoardCoord(to)) return { ...state, selected: from, preview: null };
-  return { ...state, selected: from, preview: { from, to } };
+  if (!isBoardCoord(to)) return state.selected && sameCoord(state.selected, from) && state.preview === null ? state : { ...state, selected: from, preview: null, panDirection: direction };
+  const nextPreview = { from, to };
+  if (
+    state.selected && sameCoord(state.selected, from)
+    && state.preview && sameCoord(state.preview.from, from) && sameCoord(state.preview.to, to)
+    && state.panDirection === direction
+  ) {
+    return state;
+  }
+  return { ...state, selected: from, preview: nextPreview, panDirection: direction };
 }
 
 export function releasePan(state: GameControllerState, options: CommitOptions = {}): ControllerResult {
-  if (!canAcceptInput(state) || state.panCommitted || !state.preview) return { state, accepted: false };
+  if (!canAcceptInput(state) || state.panCommitted || !state.preview) {
+    return { state: state.preview || state.panDirection ? { ...state, selected: null, preview: null, panDirection: null } : state, accepted: false };
+  }
   const animationPlan = buildMoveAnimationPlan(state.session, state.preview.from, state.preview.to, { reducedMotion: options.reducedMotion ?? false });
   const nextSession = animationPlan.accepted ? sessionFromPlan(state.session, animationPlan) : state.session;
   const accepted = nextSession !== state.session;
   return {
-    state: { ...state, session: nextSession, selected: null, preview: null, panCommitted: accepted },
+    state: { ...state, session: nextSession, selected: null, preview: null, panDirection: null, panCommitted: accepted },
     accepted,
     animationPlan,
   };
@@ -121,14 +137,6 @@ function neighbor(coord: Coord, direction: Direction): Coord {
     case 'left': return { row: coord.row, col: coord.col - 1 };
     case 'right': return { row: coord.row, col: coord.col + 1 };
   }
-}
-
-function directionBetween(from: Coord, to: Coord): Direction | null {
-  if (to.row === from.row - 1 && to.col === from.col) return 'up';
-  if (to.row === from.row + 1 && to.col === from.col) return 'down';
-  if (to.row === from.row && to.col === from.col - 1) return 'left';
-  if (to.row === from.row && to.col === from.col + 1) return 'right';
-  return null;
 }
 
 function isBoardCoord(coord: Coord): boolean {

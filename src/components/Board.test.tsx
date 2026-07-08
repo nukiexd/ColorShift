@@ -1,7 +1,7 @@
 import { fireEvent, render } from '@testing-library/react-native';
 import { createSession } from '../game/session';
 import { MoveAnimationPlan } from '../hooks/animationPlan';
-import { BoardView, calculateBoardLayout } from './Board';
+import { BoardView, boardGestureGuardStyle, calculateBoardLayout } from './Board';
 
 describe('BoardView', () => {
   afterEach(() => {
@@ -11,6 +11,16 @@ describe('BoardView', () => {
   test('calculates compact responsive geometry with 56px tile cap', () => {
     expect(calculateBoardLayout(360)).toMatchObject({ gutter: 12, boardPadding: 8, gap: 4, tileSize: 50, pitch: 54 });
     expect(calculateBoardLayout(430)).toMatchObject({ gutter: 20, boardPadding: 12, gap: 4, tileSize: 56, pitch: 60 });
+  });
+
+  test('applies web gesture guards only on the browser surface', () => {
+    expect(boardGestureGuardStyle('web')).toMatchObject({
+      touchAction: 'none',
+      userSelect: 'none',
+      WebkitUserSelect: 'none',
+      draggable: false,
+    });
+    expect(boardGestureGuardStyle('ios')).toEqual({});
   });
 
   test('renders all cells with color-independent accessibility labels', async () => {

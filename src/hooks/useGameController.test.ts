@@ -15,7 +15,8 @@ describe('game controller and stationary drag policy', () => {
     expect(gestureIntent(7, 0, 56, 'right')).toBeNull();
     expect(gestureIntent(-13, 2, 56, null)).toBe('left');
     expect(gestureIntent(2, -19, 56, null)).toBe('up');
-    expect(gestureIntent(5, 20, 56, 'right')).toBe('down');
+    expect(gestureIntent(5, 20, 56, 'right')).toBe('right');
+    expect(gestureIntent(20, 18, 56, null)).toBeNull();
   });
 
   test('tap selection supports reselection, deselection and adjacent commits', () => {
@@ -75,6 +76,27 @@ describe('game controller and stationary drag policy', () => {
     const second = releasePan(first.state);
     expect(second.accepted).toBe(false);
     expect(second.state.session).toBe(first.state.session);
+  });
+
+  test('keeps a locked pan direction and avoids repeated preview state churn', () => {
+    const session = createSession(2);
+    let state = createGameControllerState(session);
+    const from = { row: 2, col: 2 };
+
+    state = updatePan(state, from, 24, 1, 56);
+    expect(state.preview).toEqual({ from, to: { row: 2, col: 3 } });
+
+    const repeated = updatePan(state, from, 35, 4, 56);
+    expect(repeated).toBe(state);
+
+    const diagonalAfterLock = updatePan(state, from, 6, 40, 56);
+    expect(diagonalAfterLock.preview).toEqual({ from, to: { row: 2, col: 3 } });
+
+    const cancelled = updatePan(diagonalAfterLock, from, 7, 0, 56);
+    expect(cancelled.preview).toBeNull();
+
+    const restored = updatePan(cancelled, from, 6, 40, 56);
+    expect(restored.preview).toEqual({ from, to: { row: 2, col: 3 } });
   });
 
   test('invalid pan release does not block the next pan gesture', () => {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Href, useRouter } from 'expo-router';
 import { useWindowDimensions, StyleSheet, View, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -60,6 +60,59 @@ export default function GameScreen() {
     setSettledOverride(null);
   };
 
+  const handleTapTile = useCallback((coord: Parameters<typeof tapTile>[1]) => {
+    if (pendingPlan || !visibleSession || !activeController || visibleSession.phase !== 'idle') return;
+    const result = tapTile(activeController, coord, { reducedMotion: app.settings.reducedMotion });
+    controllerRef.current = result.state;
+    setController(result.state);
+    if (result.animationPlan && result.animationPlan.steps.length > 0) {
+      feedback.play('swap');
+      if (result.accepted) feedback.lightImpact();
+      setSettledOverride(null);
+      setPendingPlan(result.animationPlan);
+      setPendingSession(result.accepted ? result.state.session : null);
+    }
+  }, [activeController, app.settings.reducedMotion, feedback, pendingPlan, visibleSession]);
+
+  const handlePanMove = useCallback((coord: Parameters<typeof updatePan>[1], dx: number, dy: number, pitch: number) => {
+    if (pendingPlan || !visibleSession || !activeController || visibleSession.phase !== 'idle') return;
+    const baseController = controllerRef.current?.session.sessionId === visibleSession.sessionId ? controllerRef.current : activeController;
+    const next = updatePan(baseController, coord, dx, dy, pitch);
+    if (next === baseController) return;
+    controllerRef.current = next;
+    setController(next);
+  }, [activeController, pendingPlan, visibleSession]);
+
+  const handlePanRelease = useCallback(() => {
+    if (pendingPlan || !visibleSession || !activeController || visibleSession.phase !== 'idle') return;
+    const baseController = controllerRef.current?.session.sessionId === visibleSession.sessionId ? controllerRef.current : activeController;
+    const result = releasePan(baseController, { reducedMotion: app.settings.reducedMotion });
+    if (result.state !== baseController) {
+      controllerRef.current = result.state;
+      setController(result.state);
+    }
+    if (result.animationPlan && result.animationPlan.steps.length > 0) {
+      feedback.play('swap');
+      if (result.accepted) feedback.lightImpact();
+      setSettledOverride(null);
+      setPendingPlan(result.animationPlan);
+      setPendingSession(result.accepted ? result.state.session : null);
+    }
+  }, [activeController, app.settings.reducedMotion, feedback, pendingPlan, visibleSession]);
+
+  const handleAnimationPlanComplete = useCallback(() => {
+    if (pendingPlan) playResolutionFeedback(feedback, pendingPlan);
+    if (pendingSession) {
+      setSettledOverride(pendingSession);
+      app.settleSession(pendingSession);
+      const nextController = createGameControllerState(pendingSession);
+      controllerRef.current = nextController;
+      setController(nextController);
+    }
+    setPendingPlan(null);
+    setPendingSession(null);
+  }, [app, feedback, pendingPlan, pendingSession]);
+
   if (!session) {
     return (
       <AdaptiveBackground color={null} reducedMotion={app.settings.reducedMotion}>
@@ -82,53 +135,10 @@ export default function GameScreen() {
             selected={activeController.selected}
             preview={activeController.preview}
             animationPlan={pendingPlan}
-            onTapTile={(coord) => {
-              if (pendingPlan || visibleSession.phase !== 'idle') return;
-              const result = tapTile(activeController, coord, { reducedMotion: app.settings.reducedMotion });
-              controllerRef.current = result.state;
-              setController(result.state);
-              if (result.animationPlan && result.animationPlan.steps.length > 0) {
-                feedback.play('swap');
-                if (result.accepted) feedback.lightImpact();
-                setSettledOverride(null);
-                setPendingPlan(result.animationPlan);
-                setPendingSession(result.accepted ? result.state.session : null);
-              }
-            }}
-            onPanMove={(coord, dx, dy, pitch) => {
-              if (pendingPlan || visibleSession.phase !== 'idle') return;
-              setController((current) => {
-                const next = updatePan(current?.session.sessionId === visibleSession.sessionId ? current : activeController, coord, dx, dy, pitch);
-                controllerRef.current = next;
-                return next;
-              });
-            }}
-            onPanRelease={() => {
-              if (pendingPlan || visibleSession.phase !== 'idle') return;
-              const baseController = controllerRef.current?.session.sessionId === visibleSession.sessionId ? controllerRef.current : activeController;
-              const result = releasePan(baseController, { reducedMotion: app.settings.reducedMotion });
-              controllerRef.current = result.state;
-              setController(result.state);
-              if (result.animationPlan && result.animationPlan.steps.length > 0) {
-                feedback.play('swap');
-                if (result.accepted) feedback.lightImpact();
-                setSettledOverride(null);
-                setPendingPlan(result.animationPlan);
-                setPendingSession(result.accepted ? result.state.session : null);
-              }
-            }}
-            onAnimationPlanComplete={() => {
-              if (pendingPlan) playResolutionFeedback(feedback, pendingPlan);
-              if (pendingSession) {
-                setSettledOverride(pendingSession);
-                app.settleSession(pendingSession);
-                const nextController = createGameControllerState(pendingSession);
-                controllerRef.current = nextController;
-                setController(nextController);
-              }
-              setPendingPlan(null);
-              setPendingSession(null);
-            }}
+            onTapTile={handleTapTile}
+            onPanMove={handlePanMove}
+            onPanRelease={handlePanRelease}
+            onAnimationPlanComplete={handleAnimationPlanComplete}
           />
         </View>
         {session.phase === 'paused' ? (
