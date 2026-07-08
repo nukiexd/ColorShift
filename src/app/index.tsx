@@ -32,6 +32,11 @@ export default function HomeScreen() {
     router.push(GAME_ROUTE);
   };
 
+  const continueSession = () => {
+    app.continueGame();
+    router.push(GAME_ROUTE);
+  };
+
   return (
     <View style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
@@ -44,7 +49,7 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.actions}>
-          {hasSession ? <PrimaryButton label="Продолжить" onPress={() => router.push(GAME_ROUTE)} /> : null}
+          {hasSession ? <PrimaryButton label="Продолжить" onPress={continueSession} disabled={!app.hydrated} /> : null}
           <PrimaryButton
             label="Новая игра"
             variant={hasSession ? 'secondary' : 'primary'}

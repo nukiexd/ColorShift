@@ -202,24 +202,38 @@
 
 ## 7. Пауза, результаты, звук и восстановление
 
-- [ ] Создать PauseSheet.
-- [ ] Реализовать «Продолжить».
-- [ ] Реализовать подтверждённое «Начать заново».
-- [ ] Реализовать «Завершить игру».
-- [ ] Создать экран результатов.
-- [ ] Показать score, bestCascade, clearedTiles и earned XP.
-- [ ] Обновлять лучший результат.
-- [ ] Реализовать восстановление активной settled-сессии.
-- [ ] Создать оригинальные короткие WAV для swap, match, cascade, special и shuffle.
-- [ ] Реализовать preload и ограниченную громкость эффектов.
-- [ ] Реализовать повышающийся тон каскада с лимитом.
-- [ ] Реализовать мягкий haptic feedback.
-- [ ] Уважать отключённые звук и вибрацию.
-- [ ] Не допускать влияния ошибок audio/haptics на игровое состояние.
-- [ ] Добавить и пройти тесты session flows и feedback.
-- [ ] Пройти review соответствия спецификации.
-- [ ] Пройти review качества кода.
-- [ ] Обновить InProgress и запушить результат.
+- [x] Создать PauseSheet.
+- [x] Реализовать «Продолжить».
+- [x] Реализовать подтверждённое «Начать заново».
+- [x] Реализовать «Завершить игру».
+- [x] Создать экран результатов.
+- [x] Показать score, bestCascade, clearedTiles и earned XP.
+- [x] Обновлять лучший результат.
+- [x] Реализовать восстановление активной settled-сессии.
+- [x] Создать оригинальные короткие WAV для swap, match, cascade, special и shuffle.
+- [x] Реализовать preload и ограниченную громкость эффектов.
+- [x] Реализовать повышающийся тон каскада с лимитом.
+- [x] Реализовать мягкий haptic feedback.
+- [x] Уважать отключённые звук и вибрацию.
+- [x] Не допускать влияния ошибок audio/haptics на игровое состояние.
+- [x] Добавить и пройти тесты session flows и feedback.
+- [x] Пройти review соответствия спецификации в этом чате без отдельного агента.
+- [x] Пройти review качества кода в этом чате без отдельного агента.
+- [x] Обновить InProgress; push не выполнялся по ограничению пользователя.
+
+### Task 7 checkpoint — 8 July 2026
+
+- [x] Added RED tests for pause/continue/restart/finish/results/restore flows and feedback behavior.
+- [x] Added `PauseSheet` with continue, restart confirmation, and finish actions.
+- [x] Added `/results` route showing score, best cascade, cleared tiles, earned XP, and new-record state.
+- [x] Home continue now resumes paused saved sessions before routing to the game.
+- [x] Game finish now calls `finishGame`, clears the active session, applies XP/best score through the provider, and routes immutable result params.
+- [x] Added `src/feedback` service for swap, match, cascade, special, shuffle, and light haptics.
+- [x] Added original short WAV files for all local effects under `assets/audio`.
+- [x] Feedback respects disabled volume/haptics, caps effect volume, caps cascade pitch, and contains audio/haptic errors.
+- [x] Updated existing GameScreen tests to mock feedback in the Jest environment.
+- [x] Patched existing Expo SDK 56 package versions with `npx.cmd expo install` so `expo-doctor` passes.
+- [x] Verification passed: targeted Task 7 tests, full `npm.cmd test`, `npm.cmd run typecheck`, `npm.cmd run lint`, and `npx.cmd expo-doctor`.
 
 ## 8. Доступность, QA и релизная проверка
 

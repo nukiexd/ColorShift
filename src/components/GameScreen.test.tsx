@@ -8,6 +8,9 @@ import { AppProvider } from '../state/AppProvider';
 import { createDefaultState } from '../storage/schema';
 
 jest.mock('@react-native-async-storage/async-storage', () => ({ getItem: jest.fn(), setItem: jest.fn() }));
+jest.mock('../feedback', () => ({
+  createFeedback: jest.fn(() => ({ preload: jest.fn(), play: jest.fn(), lightImpact: jest.fn() })),
+}));
 const storage = AsyncStorage as jest.Mocked<typeof AsyncStorage>;
 
 describe('GameScreen', () => {

@@ -6,7 +6,7 @@ Last updated: 8 July 2026
 
 Active branch: feature/endless-mvp
 
-Current focus: Task 6 implementation checkpoint
+Current focus: Task 7 implementation checkpoint
 
 ## Status
 
@@ -17,7 +17,7 @@ Current focus: Task 6 implementation checkpoint
 - [ ] Task 4 — finish session, persistence, progression, and provider concurrency review
 - [ ] Task 5 — build the design system, home screen, profile, settings, and mode picker
 - [ ] Task 6 — build the animated board, tap controls, tracked directional gestures, and adaptive background
-- [ ] Task 7 — add pause, results, session restore, sound effects, and haptics
+- [x] Task 7 — add pause, results, session restore, sound effects, and haptics
 - [ ] Task 8 — complete accessibility, device QA, documentation, and release verification
 
 ## Task 4 remaining
@@ -57,12 +57,12 @@ Current focus: Task 6 implementation checkpoint
 
 ## Task 7 preview
 
-- [ ] Add pause, continue, restart confirmation, and finish
-- [ ] Add results and XP presentation
-- [ ] Restore settled active sessions
-- [ ] Add restrained local sound effects and optional haptics
-- [ ] Add session-flow and feedback tests
-- [ ] Pass specification and quality review
+- [x] Add pause, continue, restart confirmation, and finish
+- [x] Add results and XP presentation
+- [x] Restore settled active sessions
+- [x] Add restrained local sound effects and optional haptics
+- [x] Add session-flow and feedback tests
+- [x] Pass specification and quality review in this single-agent chat
 
 ## Task 8 preview
 
