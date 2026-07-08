@@ -184,7 +184,21 @@
 - [x] Получить 187 проходящих тестов, чистые typecheck и lint после первого слоя игрового экрана.
 - [ ] Пройти review соответствия спецификации.
 - [ ] Пройти review качества кода.
-- [ ] Обновить InProgress и запушить результат.
+- [x] Обновить InProgress по итогам реализации Task 6.
+- [ ] Запушить результат после разрешения пользователя.
+
+### Task 6 checkpoint — 8 July 2026
+
+- [x] Added a RED test proving `BoardView` must consume pending `animationPlan.steps` and block taps during playback.
+- [x] `BoardView` now accepts `animationPlan`, disables tile input while steps are pending, and calls `onAnimationPlanComplete` after the final step duration.
+- [x] `BoardView` renders resolver snapshots for swap, clear, fall, refill, and shuffle steps.
+- [x] `BoardView` renders stationary directional preview: the held tile remains in place while only the neighboring tile receives the preview offset.
+- [x] `BoardView` exposes pan tracking callbacks to the game screen without adding dependencies.
+- [x] `GameScreen` delays `settleSession` until animation playback completes, so only settled states are persisted.
+- [x] Added tests for pending-step input lock, stationary preview offset, and playback completion callback.
+- [x] Verification passed: targeted Task 6 tests, full `npm.cmd test`, `npm.cmd run typecheck`, and `npm.cmd run lint`.
+- [ ] Formal specification review remains pending because this chat explicitly did not run separate review agents.
+- [ ] Formal quality review remains pending because this chat explicitly did not run separate review agents.
 
 ## 7. Пауза, результаты, звук и восстановление
 

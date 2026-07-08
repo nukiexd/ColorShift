@@ -1,178 +1,72 @@
 # Color Shift — Handoff Checkpoint
 
-Дата: 8 июля 2026
+Date: 8 July 2026
 
-## Ветка
+## Branch and workspace
 
-`feature/endless-mvp`
+- Workspace: `D:\www\ColorShift\.worktrees\endless-mvp`
+- Branch: `feature/endless-mvp`
+- Commit/push: not performed
+- Subagents/review agents: not used
 
-Рабочая папка:
+## Current Task 6 status
 
-`D:\www\ColorShift\.worktrees\endless-mvp`
+Task 6 implementation is complete within this chat's constraints. The animated board now consumes `animationPlan.steps`, locks input during playback, visually advances through swap, clear, fall, refill, and shuffle snapshots, supports stationary directional preview, and settles the session only after playback completes.
 
-## Текущий статус Task 6
+Formal independent specification/quality review remains pending because the user explicitly prohibited separate scaffold/spec review/quality review agents.
 
-Task 6 частично реализован и проверен тестами. Готов первый игровой слой: экран игры, адаптивное поле, плитки, HUD, адаптивный фон, tap-контроллер, stationary drag policy, preview offsets и ordered animation plan.
+## What is done
 
-Последняя проверка перед checkpoint:
+- `BoardView` renders the 6×6 board with absolute tile positions and the existing responsive geometry.
+- Tap controls remain available.
+- Directional drag preview is wired through `PanResponder` without moving the held tile.
+- The neighboring tile moves toward the held tile during preview using `previewOffsets`.
+- `BoardView` accepts `animationPlan`.
+- Pending animation steps block tile taps and pan input.
+- `BoardView` plays resolver snapshots by step:
+  - `swap` → first phase `boardBefore`;
+  - `clear` → `boardAfterClear`;
+  - `fall` → `boardAfterGravity`;
+  - `refill` → `boardAfterRefill`;
+  - `shuffle` → final resolution board.
+- `BoardView` calls `onAnimationPlanComplete` after the final step duration.
+- `GameScreen` delays `app.settleSession` until board playback completes.
+- Reduced-motion timings continue to come from the controller/animation plan.
+- Board tests now cover:
+  - input lock while consuming `animationPlan.steps`;
+  - stationary preview offset;
+  - completion callback after pending steps.
 
-```text
-npm.cmd test
-15 passed, 187 tests passed
+## Files changed for this Task 6 continuation
 
-npm.cmd run typecheck
-passed
-
-npm.cmd run lint
-passed
-```
-
-## Что уже сделано
-
-- Task 4 quality fixes:
-  - числовые лимиты для score/XP/level/tileIdCounter;
-  - безопасный TileIdSource;
-  - sessionId и stale settlement protection;
-  - hydration gate;
-  - linearizable provider actions;
-  - playable restore validation;
-  - serialized AsyncStorage writes.
-- Task 5:
-  - `design-system/color-shift/MASTER.md`;
-  - semantic tokens;
-  - Manrope root app shell;
-  - home screen;
-  - PlayerCard;
-  - PrimaryButton;
-  - mode/profile/settings/confirm sheets;
-  - Endless enabled, Time Attack/Demining as “Скоро”;
-  - home-flow tests.
-- Task 6 first layer:
-  - `GameScreen`;
-  - `BoardView`;
-  - `TileView`;
-  - `GameHud`;
-  - `AdaptiveBackground`;
-  - tap selection/reselection/deselection;
-  - adjacent tap swap;
-  - stationary drag `gestureIntent` with 32% enable and 24% cancel thresholds;
-  - one-pan-one-swap guard;
-  - invalid rollback;
-  - reduced-motion adaptive glow;
-  - navigation from home to `/game`;
-  - controller `animationPlan` for swap/clear/fall/refill/shuffle phases.
-
-## Изменённые файлы
-
-Tracked modified:
-
-- `TASKS.md`
-- `docs/InProgress.md`
-- `src/app/_layout.tsx`
-- `src/app/index.tsx`
-- `src/game/balance.ts`
-- `src/game/random.ts`
-- `src/game/session.ts`
-- `src/state/AppProvider.test.tsx`
-- `src/state/AppProvider.tsx`
-- `src/storage/repository.ts`
-- `src/storage/schema.ts`
-
-New / untracked:
-
-- `HANDOFF.md`
-- `design-system/`
-- `src/app/game.test.tsx`
-- `src/app/game.tsx`
-- `src/components/AdaptiveBackground.test.tsx`
-- `src/components/AdaptiveBackground.tsx`
 - `src/components/Board.test.tsx`
 - `src/components/Board.tsx`
-- `src/components/GameHud.tsx`
-- `src/components/PlayerCard.tsx`
-- `src/components/PrimaryButton.tsx`
 - `src/components/Tile.tsx`
-- `src/components/home.test.tsx`
-- `src/components/sheets/`
-- `src/hooks/animationPlan.test.ts`
-- `src/hooks/animationPlan.ts`
-- `src/hooks/useGameController.test.ts`
-- `src/hooks/useGameController.ts`
-- `src/ui/`
+- `src/app/game.tsx`
+- `TASKS.md`
+- `docs/InProgress.md`
+- `HANDOFF.md`
 
-## Что осталось по Task 6
+## Verification run
 
-- Визуально проиграть `animationPlan` на Board UI.
-- Реализовать Reanimated/Animated preview swap для соседней пары.
-- Реализовать визуальные phase-анимации:
-  - swap;
-  - clear;
-  - gravity/fall;
-  - refill;
-  - shuffle.
-- Проверить rapid input во время resolution.
-- Провести specification review.
-- Провести quality review.
+- `npm.cmd test -- src/components/Board.test.tsx src/hooks/useGameController.test.ts src/hooks/animationPlan.test.ts src/app/game.test.tsx`
+  - passed: 4 suites, 15 tests
+- `npm.cmd run typecheck`
+  - passed
+- `npm.cmd run lint`
+  - passed
+- `npm.cmd test`
+  - passed: 15 suites, 190 tests
 
-## Что осталось по Task 7
+## What remains after Task 6
 
-- PauseSheet.
-- Continue from pause.
-- Confirmed restart.
-- Finish game из pause.
-- Results screen.
-- Показать score, bestCascade, clearedTiles и earned XP.
-- Best score update.
-- Restore settled active session flow.
-- Feedback service:
-  - swap;
-  - match;
-  - cascade;
-  - special;
-  - shuffle.
-- Optional haptics.
-- Respect disabled sound/haptics.
-- Tests for session flows and feedback.
-- Specification review.
-- Quality review.
+- Formal specification review and quality review are still pending if the project requires independent review gates.
+- Task 7 and Task 8 were intentionally not touched.
 
-## Что осталось по Task 8
+## Next safe small step
 
-- Full test coverage run.
-- TypeScript verification.
-- Expo lint.
-- Expo Doctor.
-- Expo web export.
-- Check no tracked `.env`.
-- Manual/device QA:
-  - 360×800;
-  - 390×844;
-  - 430×932;
-  - safe areas;
-  - touch targets;
-  - color-independent tile marks;
-  - reduced motion;
-  - pause/restart/finish/restore;
-  - background/foreground behavior.
-- README update for controls, MVP limits and `.env` warning.
-- Final whole-diff review.
-- Release verification.
+Ask the user whether to:
 
-## Reviews still needed
-
-- Task 4 repeat quality review after quality fixes.
-- Task 5 specification review.
-- Task 5 quality review.
-- Task 6 specification review.
-- Task 6 quality review.
-- Final release review in Task 8.
-
-## Следующий безопасный маленький шаг
-
-Не начинать Task 7 сразу. Сначала маленьким TDD-шагом завершить Task 6 visual playback:
-
-1. Add a focused failing test for Board UI consuming `animationPlan.steps`.
-2. Implement only one visual state transition first: accepted swap sets a temporary resolving/locked state and clears selection.
-3. Verify targeted tests, then full `npm.cmd test`, `npm.cmd run typecheck`, `npm.cmd run lint`.
-
-Do not commit or push until the user explicitly allows it.
+1. run a human/manual review of Task 6 in this same chat;
+2. commit the Task 6 checkpoint;
+3. continue later with Task 7 after explicit approval.

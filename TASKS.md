@@ -6,7 +6,7 @@ Last updated: 8 July 2026
 
 Active branch: feature/endless-mvp
 
-Current focus: Task 6 board and gestures
+Current focus: Task 6 implementation checkpoint
 
 ## Status
 
@@ -50,10 +50,10 @@ Current focus: Task 6 board and gestures
 - [x] Render a responsive 6×6 board with tiles up to 56×56
 - [x] Add tap selection and adjacent-tap swaps
 - [x] Add stationary-tile directional tracking with 32% preview and 24% cancel thresholds
-- [ ] Animate swap, clear, gravity, refill, cascade, and shuffle phases
+- [x] Animate swap, clear, gravity, refill, cascade, and shuffle phases
 - [x] Add adaptive background glow and reduced motion
 - [x] Add gesture, controller, and accessibility tests
-- [ ] Pass specification and quality review
+- [ ] Pass specification and quality review without separate review agents
 
 ## Task 7 preview
 

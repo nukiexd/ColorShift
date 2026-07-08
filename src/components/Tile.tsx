@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { GestureResponderHandlers, Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { Coord, Special, TileColor } from '../game/model';
 import { colors, radii, typography } from '../ui/tokens';
 
@@ -24,18 +24,24 @@ interface TileViewProps {
   readonly coord: Coord;
   readonly size: number;
   readonly selected?: boolean;
+  readonly disabled?: boolean;
+  readonly style?: StyleProp<ViewStyle>;
+  readonly gestureHandlers?: GestureResponderHandlers;
   readonly onPress: (coord: Coord) => void;
 }
 
-export function TileView({ color, special, coord, size, selected = false, onPress }: TileViewProps) {
+export function TileView({ color, special, coord, size, selected = false, disabled = false, style, gestureHandlers, onPress }: TileViewProps) {
   return (
     <Pressable
+      {...gestureHandlers}
       accessibilityRole="button"
       accessibilityLabel={tileAccessibilityLabel(color, special, coord, selected)}
       accessibilityState={{ selected }}
+      disabled={disabled}
       onPress={() => onPress(coord)}
       style={({ pressed }) => [
         styles.tile,
+        style,
         {
           width: size,
           height: size,
@@ -43,7 +49,8 @@ export function TileView({ color, special, coord, size, selected = false, onPres
           backgroundColor: colorMap[color],
         },
         selected && styles.selected,
-        pressed && styles.pressed,
+        pressed && !disabled && styles.pressed,
+        disabled && styles.disabled,
       ]}
     >
       <View style={styles.innerMark}>
@@ -85,6 +92,9 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.88,
+  },
+  disabled: {
+    opacity: 0.94,
   },
   innerMark: {
     width: '52%',
