@@ -2,11 +2,11 @@
 
 This is the concise project checklist. Detailed subtasks, review gates, and verification history live in [docs/InProgress.md](docs/InProgress.md).
 
-Last updated: 8 July 2026
+Last updated: 9 July 2026
 
 Active branch: feature/endless-mvp
 
-Current focus: Playtest polish fixes for Task 5/6/7 surfaces
+Current focus: Final match/special/combo rule alignment
 
 ## Status
 
@@ -71,6 +71,11 @@ Current focus: Playtest polish fixes for Task 5/6/7 surfaces
 - [x] Remove animation-lock dimming and render rainbow tiles as color stripes
 - [x] Prevent rainbow tiles from auto-activating when cleared by cascades or chained effects
 - [x] Clear same-color cells connected to a combo and keep invalid pan swipes reusable
+- [x] Align final special rules: 3 clears normally, 4 creates colored line, 5 creates colorless bomb, 6+ creates colorless rainbow
+- [x] Keep cascades creating specials while preventing groups with existing specials from creating another special
+- [x] Treat line-specials as colored match participants and bomb/rainbow specials as colorless for normal matches
+- [x] Add simple rainbow combos: rainbow + line clears line color and activates the line; rainbow + bomb and rainbow + rainbow clear the full board
+- [x] Keep line + line, line + bomb, and bomb + bomb as both-base-effects swaps without unique combo logic
 
 ## Task 7 preview
 

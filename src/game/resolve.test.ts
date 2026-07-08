@@ -125,6 +125,20 @@ test('connected horizontal and vertical same-color clears create one special by 
   expect(result.phases[0].cleared).toHaveLength(4);
 });
 
+test('a match group containing an existing line special activates it without creating a new special', () => {
+  const board = boardWith([
+    [0, 0, 'coral', 'row'], [0, 1, 'coral'], [0, 2, 'coral'], [0, 3, 'sky'], [1, 3, 'coral'],
+  ]);
+  const result = resolveMove(board, { row: 1, col: 3 }, { row: 0, col: 3 }, createSeededRandom(145));
+
+  expect(result.accepted).toBe(true);
+  expect(result.phases[0].createdSpecial).toBeNull();
+  expect(result.phases[0].cleared).toEqual(expect.arrayContaining([
+    { row: 0, col: 0 },
+    { row: 0, col: 5 },
+  ]));
+});
+
 test('same-color cells connected to a three-match clear with the combo', () => {
   const board = boardWith([
     [1, 1, 'coral'], [1, 2, 'coral'], [1, 3, 'sky'],
@@ -182,6 +196,44 @@ test('a rainbow swap is accepted without a natural match and clears its target c
   ]));
 });
 
+test('rainbow plus line clears the line color and activates the line direction', () => {
+  const board = boardWith([[0, 0, 'coral', 'rainbow'], [0, 1, 'sky', 'column']]);
+  const result = resolveMove(board, { row: 0, col: 0 }, { row: 0, col: 1 }, createSeededRandom(78));
+
+  expect(result.accepted).toBe(true);
+  expect(result.phases[0].cleared).toEqual(expect.arrayContaining([
+    { row: 0, col: 0 },
+    { row: 0, col: 1 },
+    { row: 1, col: 0 },
+    { row: 5, col: 0 },
+  ]));
+});
+
+test('rainbow plus bomb clears the entire board', () => {
+  const board = boardWith([[0, 0, 'coral', 'rainbow'], [0, 1, 'sky', 'bomb']]);
+  const result = resolveMove(board, { row: 0, col: 0 }, { row: 0, col: 1 }, createSeededRandom(79));
+
+  expect(result.accepted).toBe(true);
+  expect(result.phases[0].cleared).toHaveLength(36);
+  expect(result.phases[0].scoreDelta).toBe(3600);
+});
+
+test.each([
+  ['line plus line', 'row', 'column', true, { row: 5, col: 2 }],
+  ['line plus bomb', 'row', 'bomb', true, { row: 3, col: 1 }],
+  ['bomb plus bomb', 'bomb', 'bomb', false, { row: 3, col: 4 }],
+] as const)('%s swaps activate both base special effects', (_name, firstSpecial, secondSpecial, expectsRowClear, effectProbe) => {
+  const board = boardWith([[2, 2, 'coral', firstSpecial], [2, 3, 'sky', secondSpecial]]);
+  const result = resolveMove(board, { row: 2, col: 2 }, { row: 2, col: 3 }, createSeededRandom(80));
+
+  expect(result.accepted).toBe(true);
+  expect(result.phases[0].createdSpecial).toBeNull();
+  expect(result.phases[0].cleared).toContainEqual({ row: 2, col: 2 });
+  expect(result.phases[0].cleared).toContainEqual({ row: 2, col: 3 });
+  if (expectsRowClear) expect(result.phases[0].cleared).toContainEqual({ row: 2, col: 0 });
+  expect(result.phases[0].cleared).toContainEqual(effectProbe);
+});
+
 test('swapping two rainbows clears every tile exactly once', () => {
   const board = boardWith([[0, 0, 'coral', 'rainbow'], [0, 1, 'sky', 'rainbow']]);
   const result = resolveMove(board, { row: 0, col: 0 }, { row: 0, col: 1 }, createSeededRandom(77));
@@ -196,7 +248,6 @@ test('two rainbows suppress special creation even when their swap forms a qualif
   ]);
   const result = resolveMove(board, { row: 0, col: 0 }, { row: 0, col: 1 }, createSeededRandom(177));
 
-  expect(result.phases[0].groups[0].cells.length).toBeGreaterThanOrEqual(6);
   expect(result.phases[0].createdSpecial).toBeNull();
   expect(result.phases[0].cleared).toHaveLength(36);
 });

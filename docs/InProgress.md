@@ -2,7 +2,7 @@
 
 > Живой статус разработки Endless MVP. Файл обновляется после каждого завершённого шага и каждого review-gate.
 >
-> Последнее обновление: 8 июля 2026
+> Последнее обновление: 9 июля 2026
 >
 > Рабочая ветка: feature/endless-mvp
 
@@ -315,6 +315,21 @@
 - [x] Fixed invalid pan-swipe rollback so the next pan gesture can preview and commit normally.
 - [x] Targeted verification passed for resolver, controller, board, animation-plan, settings, and storage tests.
 - [x] Full verification passed for `npm.cmd test`, `npm.cmd run typecheck`, `npm.cmd run lint`, and `npx.cmd expo-doctor`.
+- [ ] Commit and push remain intentionally not performed unless the user requests them.
+
+### Final match/special/combo checkpoint - 9 July 2026
+
+- [x] Added RED regression coverage for final match participation rules: line-specials remain colored, while bomb-specials and rainbow-specials are colorless for normal matches.
+- [x] Added RED regression coverage that a match group containing an existing line-special activates it without creating a new special from the same group.
+- [x] Added RED regression coverage for rainbow + line, rainbow + bomb, and line/bomb base-effect swaps.
+- [x] Preserved the final creation priority: 3 tiles clear normally, 4 in a line creates a colored line-special, 5 connected same-color cleared tiles creates a colorless bomb, and 6+ creates a colorless rainbow.
+- [x] Kept cascades eligible to create line, bomb, and rainbow specials by the same rules, while newly created cascade specials do not activate immediately.
+- [x] Implemented rainbow + line as clear the line-special color plus activate that line-special direction.
+- [x] Implemented rainbow + bomb and rainbow + rainbow as full-board clears.
+- [x] Kept line + line, line + bomb, and bomb + bomb swaps as both base effects, without adding unique candy-crush-style combo logic.
+- [x] Targeted engine verification passed: `npm.cmd test -- src/game/matches.test.ts src/game/resolve.test.ts src/game/specials.test.ts`.
+- [x] Full game-engine verification passed: `npm.cmd test -- src/game`.
+- [x] Full project verification passed: `npm.cmd test`, `npm.cmd run typecheck`, `npm.cmd run lint`, and `npx.cmd expo-doctor`.
 - [ ] Commit and push remain intentionally not performed unless the user requests them.
 
 ## Вне Endless MVP

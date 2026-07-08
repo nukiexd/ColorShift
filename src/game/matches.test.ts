@@ -1,6 +1,6 @@
 import { findLegalMoves, swapCells } from './board';
 import { findMatches } from './matches';
-import { Board, MatchGroup, Tile, TileColor } from './model';
+import { Board, MatchGroup, Special, Tile, TileColor } from './model';
 
 const colors: TileColor[][] = [
   ['coral', 'sky', 'mint', 'sun', 'plum', 'coral'],
@@ -11,12 +11,12 @@ const colors: TileColor[][] = [
   ['coral', 'sky', 'mint', 'sun', 'plum', 'coral'],
 ];
 
-function boardWith(overrides: readonly (readonly [number, number, TileColor | null])[]): Board {
+function boardWith(overrides: readonly (readonly [number, number, TileColor | null, Special?])[]): Board {
   const board: (Tile | null)[][] = colors.map((row, rowIndex) =>
     row.map((color, colIndex) => ({ id: `${rowIndex}-${colIndex}`, color, special: null })),
   );
-  for (const [row, col, color] of overrides) {
-    board[row][col] = color === null ? null : { id: `${row}-${col}`, color, special: null };
+  for (const [row, col, color, special = null] of overrides) {
+    board[row][col] = color === null ? null : { id: `${row}-${col}`, color, special };
   }
   return board;
 }
@@ -59,6 +59,37 @@ test('findMatches ignores null cells and groups shorter than three', () => {
     [0, 2, null],
     [0, 3, 'coral'],
   ]);
+  expect(findMatches(board)).toEqual([]);
+});
+
+test('findMatches lets line specials participate in their color match', () => {
+  const board = boardWith([
+    [0, 0, 'coral', 'row'],
+    [0, 1, 'coral'],
+    [0, 2, 'coral'],
+  ]);
+
+  expect(findMatches(board)[0]).toEqual({
+    color: 'coral',
+    orientation: 'horizontal',
+    cells: [
+      { row: 0, col: 0 },
+      { row: 0, col: 1 },
+      { row: 0, col: 2 },
+    ],
+  });
+});
+
+test('findMatches excludes colorless bomb and rainbow specials from color matches', () => {
+  const board = boardWith([
+    [0, 0, 'coral', 'bomb'],
+    [0, 1, 'coral'],
+    [0, 2, 'coral'],
+    [1, 0, 'sky', 'rainbow'],
+    [2, 0, 'sky'],
+    [3, 0, 'sky'],
+  ]);
+
   expect(findMatches(board)).toEqual([]);
 });
 

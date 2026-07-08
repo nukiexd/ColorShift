@@ -8,10 +8,10 @@ export function findMatches(board: Board): MatchGroup[] {
     while (start < board[row].length) {
       const cell = board[row][start];
       let end = start + 1;
-      while (cell !== null && end < board[row].length && board[row][end]?.color === cell.color) {
+      while (isColorMatchTile(cell) && end < board[row].length && isSameMatchColor(cell, board[row][end] ?? null)) {
         end += 1;
       }
-      if (cell !== null && end - start >= 3) {
+      if (isColorMatchTile(cell) && end - start >= 3) {
         groups.push({
           color: cell.color,
           orientation: 'horizontal',
@@ -28,10 +28,10 @@ export function findMatches(board: Board): MatchGroup[] {
     while (start < board.length) {
       const cell = board[start]?.[col] ?? null;
       let end = start + 1;
-      while (cell !== null && end < board.length && board[end]?.[col]?.color === cell.color) {
+      while (isColorMatchTile(cell) && end < board.length && isSameMatchColor(cell, board[end]?.[col] ?? null)) {
         end += 1;
       }
-      if (cell !== null && end - start >= 3) {
+      if (isColorMatchTile(cell) && end - start >= 3) {
         groups.push({
           color: cell.color,
           orientation: 'vertical',
@@ -47,4 +47,12 @@ export function findMatches(board: Board): MatchGroup[] {
 
 function coordinates(start: number, end: number, create: (index: number) => Coord): readonly Coord[] {
   return Array.from({ length: end - start }, (_, offset) => create(start + offset));
+}
+
+function isSameMatchColor(cell: NonNullable<Board[number][number]>, other: Board[number][number]): boolean {
+  return isColorMatchTile(other) && other.color === cell.color;
+}
+
+function isColorMatchTile(cell: Board[number][number]): cell is NonNullable<Board[number][number]> {
+  return cell !== null && (cell.special === null || cell.special === 'row' || cell.special === 'column');
 }

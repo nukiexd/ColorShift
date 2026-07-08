@@ -63,8 +63,9 @@ export function resolveMove(board: Board, from: Coord, to: Coord, random: Random
   const movedFrom = getCell(current, to);
   const movedTo = getCell(current, from);
   const rainbowSwap = movedFrom?.special === 'rainbow' || movedTo?.special === 'rainbow';
+  const specialSwap = movedFrom?.special !== null || movedTo?.special !== null;
   let groups = expandedMatchGroups(current);
-  if (!rainbowSwap && !groups.some((group) => group.cells.some((coord) => sameCoord(coord, from) || sameCoord(coord, to)))) {
+  if (!specialSwap && !groups.some((group) => group.cells.some((coord) => sameCoord(coord, from) || sameCoord(coord, to)))) {
     return rejected(board);
   }
 
@@ -75,18 +76,21 @@ export function resolveMove(board: Board, from: Coord, to: Coord, random: Random
   let clearEntireBoard = false;
   if (rainbowSwap) {
     const rainbowCoords = [from, to].filter((coord) => getCell(current, coord)?.special === 'rainbow');
-    if (rainbowCoords.length === 2) clearEntireBoard = true;
+    const otherSpecial = [from, to].some((coord) => getCell(current, coord)?.special === 'bomb');
+    if (rainbowCoords.length === 2 || otherSpecial) clearEntireBoard = true;
     else {
       const rainbowCoord = rainbowCoords[0];
       const otherCoord = sameCoord(rainbowCoord, from) ? to : from;
       rainbowColor = getCell(current, otherCoord)?.color;
       specialInitial = [rainbowCoord, otherCoord];
     }
+  } else if (specialSwap) {
+    specialInitial = [from, to].filter((coord) => getCell(current, coord)?.special !== null);
   }
 
   while (groups.length > 0 || specialInitial !== null || clearEntireBoard) {
     if (cascade > MAX_CASCADES) throw new Error(`Unable to stabilize board after ${MAX_CASCADES} cascades`);
-    const created = clearEntireBoard ? null : chooseSpecial(groups, cascade === 1 ? to : undefined);
+    const created = clearEntireBoard || specialInitial !== null ? null : chooseSpecial(groups, current, cascade === 1 ? to : undefined);
     const matched = uniqueCoords(groups.flatMap((group) => group.cells));
     const initial = clearEntireBoard ? allOccupiedCoords(current) : uniqueCoords([...(specialInitial ?? []), ...matched]);
     const boardForExpansion = created ? withoutSpecial(current, created.coord) : current;
@@ -143,8 +147,9 @@ export function shuffleToPlayable(board: Board, random: RandomSource): Board {
   throw new Error(`Unable to shuffle board to a stable playable state after ${MAX_BOARD_GENERATION_ATTEMPTS} attempts`);
 }
 
-function chooseSpecial(groups: readonly MatchGroup[], playerAnchor?: Coord): { coord: Coord; special: Exclude<Special, null> } | null {
-  const components = connectedMatchComponents(groups).filter((component) => component.cells.length >= 4);
+function chooseSpecial(groups: readonly MatchGroup[], board: Board, playerAnchor?: Coord): { coord: Coord; special: Exclude<Special, null> } | null {
+  const components = connectedMatchComponents(groups)
+    .filter((component) => component.cells.length >= 4 && !componentHasExistingSpecial(board, component));
   if (components.length === 0) return null;
   const longest = Math.max(...components.map((component) => component.cells.length));
   const component = components.find((candidate) => candidate.cells.length === longest) as ConnectedMatchComponent;
@@ -170,7 +175,9 @@ function connectedSameColorCells(board: Board, color: TileColor, starts: readonl
   const seen = new Set<string>();
   const queue: Coord[] = [];
   const enqueue = (coord: Coord): void => {
-    if (!inBounds(board, coord) || getCell(board, coord)?.color !== color) return;
+    if (!inBounds(board, coord)) return;
+    const cell = getCell(board, coord);
+    if (!isColorMatchTile(cell) || cell.color !== color) return;
     const key = coordKey(coord);
     if (seen.has(key)) return;
     seen.add(key);
@@ -181,6 +188,14 @@ function connectedSameColorCells(board: Board, color: TileColor, starts: readonl
     adjacentCoords(queue[index]).forEach(enqueue);
   }
   return queue.sort((left, right) => left.row - right.row || left.col - right.col);
+}
+
+function componentHasExistingSpecial(board: Board, component: ConnectedMatchComponent): boolean {
+  return component.cells.some((coord) => getCell(board, coord)?.special !== null);
+}
+
+function isColorMatchTile(cell: Tile | null): cell is Tile {
+  return cell !== null && (cell.special === null || cell.special === 'row' || cell.special === 'column');
 }
 
 interface ConnectedMatchComponent {
