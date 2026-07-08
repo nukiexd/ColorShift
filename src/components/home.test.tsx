@@ -76,11 +76,10 @@ describe('Color Shift home experience', () => {
     await waitFor(() => expect(view.getByText('Никнейм должен быть от 2 до 16 символов')).toBeTruthy());
 
     await press(view.getByRole('button', { name: 'Настройки' }));
-    await press(view.getByRole('button', { name: 'Увеличить громкость эффектов' }));
+    await press(view.getByRole('switch', { name: 'Звук' }));
     await press(view.getByRole('switch', { name: 'Вибрация' }));
-    await press(view.getByRole('switch', { name: 'Меньше анимации' }));
-    await waitFor(() => expect(view.getByText('Громкость 45%')).toBeTruthy());
+    await waitFor(() => expect(view.getByRole('switch', { name: 'Звук' }).props.accessibilityState.checked).toBe(false));
     expect(view.getByRole('switch', { name: 'Вибрация' }).props.accessibilityState.checked).toBe(false);
-    expect(view.getByRole('switch', { name: 'Меньше анимации' }).props.accessibilityState.checked).toBe(true);
+    expect(view.queryByRole('switch', { name: 'Меньше анимации' })).toBeNull();
   });
 });

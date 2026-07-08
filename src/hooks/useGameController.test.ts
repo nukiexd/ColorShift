@@ -11,9 +11,9 @@ import {
 describe('game controller and stationary drag policy', () => {
   test('uses hysteresis thresholds for invisible directional tracking', () => {
     expect(gestureIntent(10, 0, 56, null)).toBeNull();
-    expect(gestureIntent(18, 3, 56, null)).toBe('right');
-    expect(gestureIntent(10, 0, 56, 'right')).toBeNull();
-    expect(gestureIntent(-20, 2, 56, null)).toBe('left');
+    expect(gestureIntent(13, 3, 56, null)).toBe('right');
+    expect(gestureIntent(7, 0, 56, 'right')).toBeNull();
+    expect(gestureIntent(-13, 2, 56, null)).toBe('left');
     expect(gestureIntent(2, -19, 56, null)).toBe('up');
     expect(gestureIntent(5, 20, 56, 'right')).toBe('down');
   });
@@ -51,6 +51,7 @@ describe('game controller and stationary drag policy', () => {
     expect(rejected.accepted).toBe(false);
     expect(rejected.state.session).toBe(session);
     expect(rejected.state.selected).toBeNull();
+    expect(rejected.animationPlan?.steps.map((step) => step.type)).toEqual(['swap', 'swapBack']);
 
     const paused = createGameControllerState({ ...session, phase: 'paused' });
     expect(tapTile(paused, from).state).toBe(paused);
@@ -74,6 +75,24 @@ describe('game controller and stationary drag policy', () => {
     const second = releasePan(first.state);
     expect(second.accepted).toBe(false);
     expect(second.state.session).toBe(first.state.session);
+  });
+
+  test('invalid pan release does not block the next pan gesture', () => {
+    const session = createSession(8);
+    const legalKeys = new Set(findLegalMoves(session.board).map(([from, to]) => key(from, to)));
+    const invalid = adjacentPairs().find(([from, to]) => !legalKeys.has(key(from, to)) && !legalKeys.has(key(to, from)));
+    expect(invalid).toBeDefined();
+    const [from, to] = invalid!;
+    const dx = to.col > from.col ? 24 : to.col < from.col ? -24 : 0;
+    const dy = to.row > from.row ? 24 : to.row < from.row ? -24 : 0;
+
+    let state = updatePan(createGameControllerState(session), from, dx, dy, 56);
+    const rejected = releasePan(state);
+    expect(rejected.accepted).toBe(false);
+    expect(rejected.state.panCommitted).toBe(false);
+
+    state = updatePan(rejected.state, from, dx, dy, 56);
+    expect(state.preview).toEqual({ from, to });
   });
 });
 

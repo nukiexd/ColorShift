@@ -6,7 +6,7 @@ Last updated: 8 July 2026
 
 Active branch: feature/endless-mvp
 
-Current focus: Task 8 local release-candidate verification
+Current focus: Playtest polish fixes for Task 5/6/7 surfaces
 
 ## Status
 
@@ -54,6 +54,23 @@ Current focus: Task 8 local release-candidate verification
 - [x] Add adaptive background glow and reduced motion
 - [x] Add gesture, controller, and accessibility tests
 - [ ] Pass specification and quality review without separate review agents
+
+## Playtest polish — 8 July 2026
+
+- [x] Restore visible board motion for swap, clear, fall, refill, shuffle, and adaptive background glow
+- [x] Keep tap controls and make drag gestures use a stable motion wrapper
+- [x] Replace effects volume stepping with a simple sound on/off switch
+- [x] Remove regular tile marks while preserving special-tile marks
+- [x] Add regression coverage for the polish fixes
+- [x] Smooth swap/cascade presentation after phone playtest feedback
+- [x] Reset pan controls after each animated settlement
+- [x] Add bottom safe-area spacing to sheets for Android navigation bars
+- [x] Lower pan-swipe thresholds and animate invalid swaps forward then back
+- [x] Keep the faster reduced-motion timing as the default and hide the setting for now
+- [x] Count connected simultaneous same-color match components when creating special tiles
+- [x] Remove animation-lock dimming and render rainbow tiles as color stripes
+- [x] Prevent rainbow tiles from auto-activating when cleared by cascades or chained effects
+- [x] Clear same-color cells connected to a combo and keep invalid pan swipes reusable
 
 ## Task 7 preview
 

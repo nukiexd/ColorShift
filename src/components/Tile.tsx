@@ -1,4 +1,5 @@
-import { GestureResponderHandlers, Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { TILE_COLORS } from '../game/balance';
 import { Coord, Special, TileColor } from '../game/model';
 import { colors, radii, typography } from '../ui/tokens';
 
@@ -10,14 +11,6 @@ const colorMap: Record<TileColor, string> = {
   plum: colors.plum,
 };
 
-const markMap: Record<TileColor, string> = {
-  coral: '◆',
-  sky: '●',
-  mint: '■',
-  sun: '▲',
-  plum: '✦',
-};
-
 interface TileViewProps {
   readonly color: TileColor;
   readonly special: Special;
@@ -25,15 +18,14 @@ interface TileViewProps {
   readonly size: number;
   readonly selected?: boolean;
   readonly disabled?: boolean;
-  readonly style?: StyleProp<ViewStyle>;
-  readonly gestureHandlers?: GestureResponderHandlers;
   readonly onPress: (coord: Coord) => void;
 }
 
-export function TileView({ color, special, coord, size, selected = false, disabled = false, style, gestureHandlers, onPress }: TileViewProps) {
+export function TileView({ color, special, coord, size, selected = false, disabled = false, onPress }: TileViewProps) {
+  const mark = specialMark(special);
+  const isRainbow = special === 'rainbow';
   return (
     <Pressable
-      {...gestureHandlers}
       accessibilityRole="button"
       accessibilityLabel={tileAccessibilityLabel(color, special, coord, selected)}
       accessibilityState={{ selected }}
@@ -41,21 +33,35 @@ export function TileView({ color, special, coord, size, selected = false, disabl
       onPress={() => onPress(coord)}
       style={({ pressed }) => [
         styles.tile,
-        style,
         {
           width: size,
           height: size,
           borderRadius: Math.min(radii.tile, size / 3),
-          backgroundColor: colorMap[color],
+          backgroundColor: isRainbow ? colors.surfaceRaised : colorMap[color],
         },
         selected && styles.selected,
         pressed && !disabled && styles.pressed,
-        disabled && styles.disabled,
       ]}
     >
-      <View style={styles.innerMark}>
-        <Text style={styles.mark}>{specialMark(special) ?? markMap[color]}</Text>
-      </View>
+      {isRainbow ? (
+        <View
+          testID={`rainbow-tile-${coord.row}-${coord.col}`}
+          style={[styles.rainbow, { borderRadius: Math.min(radii.tile, size / 3) }]}
+        >
+          {TILE_COLORS.map((stripe) => (
+            <View
+              key={stripe}
+              testID={`rainbow-stripe-${stripe}-${coord.row}-${coord.col}`}
+              style={[styles.rainbowStripe, { backgroundColor: colorMap[stripe] }]}
+            />
+          ))}
+        </View>
+      ) : null}
+      {mark ? (
+        <View style={styles.innerMark}>
+          <Text style={styles.mark}>{mark}</Text>
+        </View>
+      ) : null}
     </Pressable>
   );
 }
@@ -72,7 +78,6 @@ function specialMark(special: Special): string | null {
     case 'row': return '↔';
     case 'column': return '↕';
     case 'bomb': return '✹';
-    case 'rainbow': return '◎';
     default: return null;
   }
 }
@@ -93,8 +98,14 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: 0.88,
   },
-  disabled: {
-    opacity: 0.94,
+  rainbow: {
+    position: 'absolute',
+    inset: 0,
+    flexDirection: 'row',
+    overflow: 'hidden',
+  },
+  rainbowStripe: {
+    flex: 1,
   },
   innerMark: {
     width: '52%',

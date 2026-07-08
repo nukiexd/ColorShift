@@ -24,6 +24,14 @@ test('a row special clears its row and chains another special without duplicates
   expect(cleared).toContainEqual({ row: 2, col: 5 });
 });
 
+test('non-rainbow specials still activate when reached by a chained clear', () => {
+  const board = boardWith([[2, 1, 'row'], [2, 4, 'bomb']]);
+  const cleared = expandSpecialClears(board, [{ row: 2, col: 1 }]);
+
+  expect(cleared).toContainEqual({ row: 1, col: 3 });
+  expect(cleared).toContainEqual({ row: 3, col: 5 });
+});
+
 test('a bomb at the corner is clipped to the board', () => {
   const board = boardWith([[0, 0, 'bomb']]);
   expect(expandSpecialClears(board, [{ row: 0, col: 0 }])).toEqual([
@@ -41,6 +49,13 @@ test('a rainbow clears the explicit target color', () => {
   expect(cleared).toContainEqual({ row: 5, col: 1 });
 });
 
+test('a rainbow cleared without an explicit swap target does not activate', () => {
+  const board = boardWith([[0, 0, 'rainbow']]);
+  const cleared = expandSpecialClears(board, [{ row: 0, col: 0 }]);
+
+  expect(cleared).toEqual([{ row: 0, col: 0 }]);
+});
+
 test('special effects do not report empty cells as cleared', () => {
   const board = boardWith([[0, 0, 'bomb']]).map((row) => [...row]) as (Tile | null)[][];
   board[0][1] = null;
@@ -48,7 +63,7 @@ test('special effects do not report empty cells as cleared', () => {
   expect(expandSpecialClears(board, [{ row: 0, col: 0 }])).not.toContainEqual({ row: 0, col: 1 });
 });
 
-test('an explicitly targeted rainbow does not pass its color to a chained rainbow', () => {
+test('an explicitly targeted rainbow does not activate a chained rainbow without a swap target', () => {
   const board: Tile[][] = Array.from({ length: 6 }, (_, row) =>
     Array.from({ length: 6 }, (_, col) => ({
       id: `${row}-${col}`,
@@ -63,5 +78,5 @@ test('an explicitly targeted rainbow does not pass its color to a chained rainbo
   const cleared = expandSpecialClears(board, [{ row: 0, col: 0 }], 'sky');
 
   expect(cleared).toContainEqual({ row: 0, col: 5 });
-  expect(cleared).toContainEqual({ row: 3, col: 5 });
+  expect(cleared).not.toContainEqual({ row: 3, col: 5 });
 });

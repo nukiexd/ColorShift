@@ -25,7 +25,7 @@ export interface PersistedState {
 }
 
 export const DEFAULT_PROFILE: Profile = { nickname: 'Игрок', level: 1, xp: 0, bestScore: 0 };
-export const DEFAULT_SETTINGS: Settings = { effectsVolume: 0.35, haptics: true, reducedMotion: false };
+export const DEFAULT_SETTINGS: Settings = { effectsVolume: 0.35, haptics: true, reducedMotion: true };
 
 export function createDefaultState(): PersistedState {
   return { version: 1, profile: { ...DEFAULT_PROFILE }, settings: { ...DEFAULT_SETTINGS }, activeSession: null };

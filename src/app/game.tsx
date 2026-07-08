@@ -21,7 +21,9 @@ export default function GameScreen() {
   const controllerRef = useRef<GameControllerState | null>(controller);
   const [pendingPlan, setPendingPlan] = useState<MoveAnimationPlan | null>(null);
   const [pendingSession, setPendingSession] = useState<GameControllerState['session'] | null>(null);
-  const activeController = session ? controller?.session.sessionId === session.sessionId ? controller : createGameControllerState(session) : null;
+  const [settledOverride, setSettledOverride] = useState<GameControllerState['session'] | null>(null);
+  const visibleSession = pendingPlan ? session : settledOverride ?? session;
+  const activeController = visibleSession ? controller?.session.sessionId === visibleSession.sessionId ? controller : createGameControllerState(visibleSession) : null;
   const feedback = useMemo(() => createFeedback(app.settings), [app.settings]);
 
   useEffect(() => {
@@ -55,6 +57,7 @@ export default function GameScreen() {
     setController(nextController);
     setPendingPlan(null);
     setPendingSession(null);
+    setSettledOverride(null);
   };
 
   if (!session) {
@@ -66,55 +69,63 @@ export default function GameScreen() {
       </AdaptiveBackground>
     );
   }
-  if (!activeController) return null;
+  if (!visibleSession || !activeController) return null;
 
   return (
-    <AdaptiveBackground color={session.backgroundColor} reducedMotion={app.settings.reducedMotion}>
+    <AdaptiveBackground color={visibleSession.backgroundColor} reducedMotion={app.settings.reducedMotion}>
       <SafeAreaView style={styles.safeArea}>
-        <GameHud session={session} bestScore={app.profile.bestScore} onPause={app.pauseGame} />
+        <GameHud session={visibleSession} bestScore={app.profile.bestScore} onPause={app.pauseGame} />
         <View style={styles.boardWrap}>
           <BoardView
-            session={session}
+            session={visibleSession}
             width={width}
             selected={activeController.selected}
             preview={activeController.preview}
             animationPlan={pendingPlan}
             onTapTile={(coord) => {
-              if (pendingPlan || session.phase !== 'idle') return;
+              if (pendingPlan || visibleSession.phase !== 'idle') return;
               const result = tapTile(activeController, coord, { reducedMotion: app.settings.reducedMotion });
               controllerRef.current = result.state;
               setController(result.state);
-              if (result.accepted && result.animationPlan) {
+              if (result.animationPlan && result.animationPlan.steps.length > 0) {
                 feedback.play('swap');
-                feedback.lightImpact();
+                if (result.accepted) feedback.lightImpact();
+                setSettledOverride(null);
                 setPendingPlan(result.animationPlan);
-                setPendingSession(result.state.session);
+                setPendingSession(result.accepted ? result.state.session : null);
               }
             }}
             onPanMove={(coord, dx, dy, pitch) => {
-              if (pendingPlan || session.phase !== 'idle') return;
+              if (pendingPlan || visibleSession.phase !== 'idle') return;
               setController((current) => {
-                const next = updatePan(current?.session.sessionId === session.sessionId ? current : activeController, coord, dx, dy, pitch);
+                const next = updatePan(current?.session.sessionId === visibleSession.sessionId ? current : activeController, coord, dx, dy, pitch);
                 controllerRef.current = next;
                 return next;
               });
             }}
             onPanRelease={() => {
-              if (pendingPlan || session.phase !== 'idle') return;
-              const baseController = controllerRef.current?.session.sessionId === session.sessionId ? controllerRef.current : activeController;
+              if (pendingPlan || visibleSession.phase !== 'idle') return;
+              const baseController = controllerRef.current?.session.sessionId === visibleSession.sessionId ? controllerRef.current : activeController;
               const result = releasePan(baseController, { reducedMotion: app.settings.reducedMotion });
               controllerRef.current = result.state;
               setController(result.state);
-              if (result.accepted && result.animationPlan) {
+              if (result.animationPlan && result.animationPlan.steps.length > 0) {
                 feedback.play('swap');
-                feedback.lightImpact();
+                if (result.accepted) feedback.lightImpact();
+                setSettledOverride(null);
                 setPendingPlan(result.animationPlan);
-                setPendingSession(result.state.session);
+                setPendingSession(result.accepted ? result.state.session : null);
               }
             }}
             onAnimationPlanComplete={() => {
               if (pendingPlan) playResolutionFeedback(feedback, pendingPlan);
-              if (pendingSession) app.settleSession(pendingSession);
+              if (pendingSession) {
+                setSettledOverride(pendingSession);
+                app.settleSession(pendingSession);
+                const nextController = createGameControllerState(pendingSession);
+                controllerRef.current = nextController;
+                setController(nextController);
+              }
               setPendingPlan(null);
               setPendingSession(null);
             }}

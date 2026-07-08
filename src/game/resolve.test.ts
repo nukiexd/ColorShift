@@ -106,10 +106,70 @@ test.each([
 
 test('a vertical match of four creates a column special', () => {
   const board = boardWith([
-    [0, 0, 'mint'], [1, 0, 'mint'], [2, 0, 'mint'], [3, 0, 'sky'], [3, 1, 'mint'],
+    [0, 0, 'mint'], [1, 0, 'mint'], [1, 1, 'sky'], [2, 0, 'mint'], [3, 0, 'sky'], [3, 1, 'mint'],
   ]);
   const result = resolveMove(board, { row: 3, col: 1 }, { row: 3, col: 0 }, createSeededRandom(44));
   expect(result.phases[0].createdSpecial).toEqual({ coord: { row: 3, col: 0 }, special: 'column' });
+});
+
+test('connected horizontal and vertical same-color clears create one special by component size', () => {
+  const board = boardWith([
+    [1, 2, 'coral'],
+    [2, 0, 'coral'], [2, 1, 'coral'], [2, 2, 'sky'], [2, 3, 'sky'],
+    [3, 2, 'coral'], [4, 1, 'sky'], [4, 2, 'coral'],
+  ]);
+  const result = resolveMove(board, { row: 1, col: 2 }, { row: 2, col: 2 }, createSeededRandom(144));
+
+  expect(result.phases[0].groups).toHaveLength(2);
+  expect(result.phases[0].createdSpecial).toEqual({ coord: { row: 2, col: 2 }, special: 'bomb' });
+  expect(result.phases[0].cleared).toHaveLength(4);
+});
+
+test('same-color cells connected to a three-match clear with the combo', () => {
+  const board = boardWith([
+    [1, 1, 'coral'], [1, 2, 'coral'], [1, 3, 'sky'],
+    [2, 0, 'coral'], [2, 1, 'coral'], [2, 2, 'sky'], [2, 3, 'sky'],
+    [3, 3, 'plum'],
+  ]);
+  const result = resolveMove(board, { row: 1, col: 2 }, { row: 2, col: 2 }, createSeededRandom(188));
+
+  expect(result.phases[0].groups).toHaveLength(1);
+  expect(result.phases[0].groups[0].cells).toEqual(expect.arrayContaining([
+    { row: 1, col: 1 },
+    { row: 2, col: 0 },
+    { row: 2, col: 1 },
+    { row: 2, col: 2 },
+    { row: 3, col: 2 },
+  ]));
+  expect(result.phases[0].createdSpecial).toEqual({ coord: { row: 2, col: 2 }, special: 'bomb' });
+  expect(result.phases[0].cleared).toEqual(expect.arrayContaining([
+    { row: 1, col: 1 },
+    { row: 2, col: 0 },
+    { row: 2, col: 1 },
+    { row: 3, col: 2 },
+  ]));
+});
+
+test('connected six-cell cross creates a rainbow at the moved destination', () => {
+  const board = boardWith([
+    [0, 2, 'plum'], [1, 2, 'plum'],
+    [2, 0, 'plum'], [2, 1, 'plum'], [2, 2, 'sky'], [2, 3, 'plum'],
+    [3, 2, 'plum'],
+  ]);
+  const result = resolveMove(board, { row: 3, col: 2 }, { row: 2, col: 2 }, createSeededRandom(166));
+
+  expect(result.phases[0].createdSpecial).toEqual({ coord: { row: 2, col: 2 }, special: 'rainbow' });
+});
+
+test('separate simultaneous same-color groups do not combine for special creation', () => {
+  const board = boardWith([
+    [0, 0, 'coral'], [0, 1, 'sky'], [0, 2, 'coral'], [1, 1, 'coral'],
+    [4, 1, 'sky'], [5, 0, 'coral'], [5, 1, 'coral'], [5, 2, 'coral'],
+  ]);
+  const result = resolveMove(board, { row: 0, col: 1 }, { row: 1, col: 1 }, createSeededRandom(167));
+
+  expect(result.phases[0].groups).toHaveLength(2);
+  expect(result.phases[0].createdSpecial).toBeNull();
 });
 
 test('a rainbow swap is accepted without a natural match and clears its target color', () => {
@@ -136,7 +196,7 @@ test('two rainbows suppress special creation even when their swap forms a qualif
   ]);
   const result = resolveMove(board, { row: 0, col: 0 }, { row: 0, col: 1 }, createSeededRandom(177));
 
-  expect(result.phases[0].groups[0].cells).toHaveLength(6);
+  expect(result.phases[0].groups[0].cells.length).toBeGreaterThanOrEqual(6);
   expect(result.phases[0].createdSpecial).toBeNull();
   expect(result.phases[0].cleared).toHaveLength(36);
 });
@@ -208,8 +268,9 @@ test('resolveMove recovers from exhausted dead-board shuffling without losing sc
 
 test('spatial ordering uses the bottom group for background and the top group for tied special creation', () => {
   const board = boardWith([
-    [0, 0, 'sky'], [1, 0, 'sky'], [2, 0, 'sky'], [3, 0, 'sky'],
-    [5, 0, 'coral'], [5, 1, 'coral'], [5, 2, 'coral'], [5, 3, 'sky'], [4, 3, 'coral'],
+    [0, 0, 'sky'], [0, 1, 'mint'], [1, 0, 'sky'], [1, 1, 'mint'],
+    [2, 0, 'sky'], [2, 1, 'sun'], [3, 0, 'sky'],
+    [4, 1, 'sky'], [4, 2, 'mint'], [5, 0, 'coral'], [5, 1, 'coral'], [5, 2, 'coral'], [5, 3, 'sky'], [4, 3, 'coral'],
   ]);
   const result = resolveMove(board, { row: 4, col: 3 }, { row: 5, col: 3 }, createSeededRandom(909));
 

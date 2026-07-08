@@ -1,14 +1,14 @@
-import { PropsWithChildren } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { PropsWithChildren, useEffect, useState } from 'react';
+import { Animated, StyleSheet, View } from 'react-native';
 import { TileColor } from '../game/model';
 import { colors } from '../ui/tokens';
 
 const glowColor: Record<TileColor, string> = {
-  coral: 'rgba(217, 107, 104, 0.22)',
-  sky: 'rgba(103, 169, 201, 0.22)',
-  mint: 'rgba(113, 183, 151, 0.22)',
-  sun: 'rgba(216, 182, 95, 0.2)',
-  plum: 'rgba(154, 114, 158, 0.22)',
+  coral: 'rgba(217, 107, 104, 0.14)',
+  sky: 'rgba(103, 169, 201, 0.14)',
+  mint: 'rgba(113, 183, 151, 0.14)',
+  sun: 'rgba(216, 182, 95, 0.12)',
+  plum: 'rgba(154, 114, 158, 0.14)',
 };
 
 interface AdaptiveBackgroundProps extends PropsWithChildren {
@@ -19,16 +19,26 @@ interface AdaptiveBackgroundProps extends PropsWithChildren {
 export function adaptiveGlowConfig(color: TileColor | null, reducedMotion: boolean) {
   return {
     backgroundColor: color ? glowColor[color] : 'transparent',
-    opacity: color ? 0.18 : 0,
-    transitionMs: reducedMotion ? 80 : 220,
+    opacity: color ? reducedMotion ? 0.1 : 0.12 : 0,
+    transitionMs: reducedMotion ? 80 : 320,
   };
 }
 
 export function AdaptiveBackground({ color, reducedMotion = false, children }: AdaptiveBackgroundProps) {
   const glow = adaptiveGlowConfig(color, reducedMotion);
+  const [opacity] = useState(() => new Animated.Value(glow.opacity));
+
+  useEffect(() => {
+    Animated.timing(opacity, {
+      toValue: glow.opacity,
+      duration: glow.transitionMs,
+      useNativeDriver: true,
+    }).start();
+  }, [glow.opacity, glow.transitionMs, opacity]);
+
   return (
     <View testID="adaptive-background-root" style={styles.base}>
-      <View pointerEvents="none" testID="adaptive-background-glow" style={[styles.glow, { backgroundColor: glow.backgroundColor, opacity: glow.opacity }]} />
+      <Animated.View pointerEvents="none" testID="adaptive-background-glow" style={[styles.glow, { backgroundColor: glow.backgroundColor, opacity }]} />
       {children}
     </View>
   );
@@ -42,10 +52,10 @@ const styles = StyleSheet.create({
   },
   glow: {
     position: 'absolute',
-    top: -120,
-    right: -100,
-    width: 280,
-    height: 280,
-    borderRadius: 140,
+    top: -96,
+    right: -76,
+    width: 220,
+    height: 220,
+    borderRadius: 110,
   },
 });

@@ -17,6 +17,10 @@ function deadBoard(): Board {
 }
 
 describe('persisted state schema', () => {
+  test('defaults to the faster animation profile', () => {
+    expect(createDefaultState().settings.reducedMotion).toBe(true);
+  });
+
   test('accepts a valid state and trims a valid nickname', () => {
     const state = createDefaultState();
     expect(parsePersistedState({ ...state, profile: { ...state.profile, nickname: '  Лиса  ' }, activeSession: createSession(3) }))

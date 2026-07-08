@@ -272,6 +272,51 @@
 - [x] README, TASKS, and InProgress were updated for the Task 8 local release-candidate checkpoint.
 - [ ] Commit and push were intentionally not performed by user request.
 
+### Playtest polish checkpoint — 8 July 2026
+
+- [x] Added RED regression coverage for regular tile marks, special-only marks, stationary preview motion wrappers, and sound settings as a binary switch.
+- [x] Replaced regular color marks with plain tiles while preserving special marks and accessibility labels.
+- [x] Moved pan responder handling onto stable animated tile wrappers so drag gestures are not coupled to the Pressable tap surface.
+- [x] Added visible Animated transitions for swap, clear, fall, refill, shuffle, and adaptive background glow using existing resolver snapshots.
+- [x] Replaced the effects-volume increment button with a sound on/off switch backed by the existing `effectsVolume` setting.
+- [x] Verification passed for targeted Board, home/settings, background, controller, and animation-plan tests, plus full tests, typecheck, and lint.
+- [ ] Commit and push remain intentionally not performed unless the user requests them.
+
+### Phone playtest fix checkpoint — 8 July 2026
+
+- [x] Stored the true pre-move board in `MoveAnimationPlan` so swap animation starts from the visible board instead of the resolver's post-swap phase snapshot.
+- [x] Reset the game controller after animated settlement so pan gestures are available after every completed move.
+- [x] Removed cached pan responders that captured stale controller/session callbacks after the first swipe.
+- [x] Made tile pan responders avoid stealing tap start events and respect the animation lock state.
+- [x] Kept an optimistic visible settled session after animation completion so the board does not flash back to the pre-move state while AppProvider catches up.
+- [x] Stopped in-flight tile animations before starting the next step and used JS-driven board transforms to avoid stale native-driver offsets.
+- [x] Softened adaptive background glow opacity, size, and transition timing to avoid heavy darkening during cascades.
+- [x] Added bottom safe-area padding for modal sheets so settings controls clear Android navigation bars.
+- [x] Added regression coverage for pre-move animation plans, sheet safe-area padding, softer glow, and updated board behavior.
+- [x] Verification passed: targeted affected tests, full `npm.cmd test`, `npm.cmd run typecheck`, and `npm.cmd run lint`.
+- [ ] Commit and push remain intentionally not performed unless the user requests them.
+
+### Pan-swipe and special-rule polish checkpoint - 8 July 2026
+
+- [x] Added regression coverage for easier pan-swipe activation and preview cancellation thresholds.
+- [x] Lowered pan intent activation from 32% to 22% of cell pitch and cancellation from 24% to 14%.
+- [x] Added invalid-swap animation plans that move the pair forward and then return it before re-enabling input.
+- [x] Kept the faster reduced-motion timing as the default for new settings and removed the settings-row toggle for now.
+- [x] Added regression coverage for hidden reduced-motion settings UI and the default reduced-motion value.
+- [x] Changed special-tile creation to count connected same-color match components cleared in the same phase, including T/L/cross clears.
+- [x] Kept separate simultaneous same-color groups from combining into one special.
+- [x] Verified that 6+ connected clears create a rainbow at the moved destination and rainbow swaps clear the target color currently on the board.
+- [x] Removed visual dimming while cascade and invalid-swap animation locks input.
+- [x] Rendered rainbow tiles as striped blocks using the five game colors, without an extra special icon.
+- [x] Removed the rainbow tile inset so the stripes reach the tile edges without a separate outline.
+- [x] Prevented rainbow tiles from auto-activating when they are cleared by cascades or chained special effects without an explicit swap target.
+- [x] Expanded ordinary combo clears to include same-color cells connected to the matched line in the same phase.
+- [x] Kept row, column, and bomb specials chain-activating when reached by cascade or special clears; only passive rainbow activation is suppressed.
+- [x] Fixed invalid pan-swipe rollback so the next pan gesture can preview and commit normally.
+- [x] Targeted verification passed for resolver, controller, board, animation-plan, settings, and storage tests.
+- [x] Full verification passed for `npm.cmd test`, `npm.cmd run typecheck`, `npm.cmd run lint`, and `npx.cmd expo-doctor`.
+- [ ] Commit and push remain intentionally not performed unless the user requests them.
+
 ## Вне Endless MVP
 
 Эти пункты намеренно не входят в текущий цикл и не отмечаются как незавершённые задачи MVP:

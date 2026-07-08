@@ -1,5 +1,6 @@
-import { PropsWithChildren } from 'react';
+import { PropsWithChildren, useContext } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 import { colors, componentTokens, spacing, typography } from '../../ui/tokens';
 
 interface SheetFrameProps extends PropsWithChildren {
@@ -8,9 +9,10 @@ interface SheetFrameProps extends PropsWithChildren {
 }
 
 export function SheetFrame({ title, onClose, children }: SheetFrameProps) {
+  const insets = useContext(SafeAreaInsetsContext);
   return (
     <View style={styles.backdrop}>
-      <View style={styles.sheet}>
+      <View style={[styles.sheet, { paddingBottom: sheetPaddingBottom(insets?.bottom ?? 0) }]}>
         <View style={styles.header}>
           <Text style={styles.title}>{title}</Text>
           <Pressable accessibilityRole="button" accessibilityLabel="Закрыть" onPress={onClose} style={styles.closeButton}>
@@ -21,6 +23,10 @@ export function SheetFrame({ title, onClose, children }: SheetFrameProps) {
       </View>
     </View>
   );
+}
+
+export function sheetPaddingBottom(bottomInset: number): number {
+  return componentTokens.sheet.padding + Math.max(0, bottomInset - spacing.sm);
 }
 
 const styles = StyleSheet.create({

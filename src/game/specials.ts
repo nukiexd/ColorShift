@@ -1,4 +1,3 @@
-import { TILE_COLORS } from './balance';
 import { Board, Coord, TileColor } from './model';
 
 export function expandSpecialClears(board: Board, initial: readonly Coord[], rainbowColor?: TileColor): Coord[] {
@@ -31,8 +30,8 @@ export function expandSpecialClears(board: Board, initial: readonly Coord[], rai
       for (let row = coord.row - 1; row <= coord.row + 1; row += 1) {
         for (let col = coord.col - 1; col <= coord.col + 1; col += 1) enqueue({ row, col });
       }
-    } else if (special === 'rainbow') {
-      const target = explicitRainbowKey === coordKey(coord) ? rainbowColor : mostCommonColor(board, coord);
+    } else if (special === 'rainbow' && explicitRainbowKey === coordKey(coord)) {
+      const target = rainbowColor;
       for (let row = 0; row < board.length; row += 1) {
         for (let col = 0; col < board[row].length; col += 1) {
           if (board[row][col]?.color === target) enqueue({ row, col });
@@ -42,20 +41,6 @@ export function expandSpecialClears(board: Board, initial: readonly Coord[], rai
   }
 
   return result;
-}
-
-function mostCommonColor(board: Board, rainbow: Coord): TileColor {
-  const counts = new Map<TileColor, number>(TILE_COLORS.map((color) => [color, 0]));
-  for (let row = 0; row < board.length; row += 1) {
-    for (let col = 0; col < board[row].length; col += 1) {
-      if (row === rainbow.row && col === rainbow.col) continue;
-      const tile = board[row][col];
-      if (tile) counts.set(tile.color, (counts.get(tile.color) ?? 0) + 1);
-    }
-  }
-  return TILE_COLORS.reduce((best, color) =>
-    (counts.get(color) ?? 0) > (counts.get(best) ?? 0) ? color : best,
-  );
 }
 
 function coordKey(coord: Coord): string {

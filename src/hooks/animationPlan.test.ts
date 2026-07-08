@@ -19,7 +19,7 @@ describe('animation plan', () => {
     const [from] = findLegalMoves(session.board)[0];
     const previewing = updatePan(createGameControllerState(session), from, 24, 0, 56);
     expect(previewing.preview).not.toBeNull();
-    const cancelled = updatePan(previewing, from, 10, 0, 56);
+    const cancelled = updatePan(previewing, from, 7, 0, 56);
     expect(cancelled.preview).toBeNull();
   });
 
@@ -29,6 +29,8 @@ describe('animation plan', () => {
     const plan = buildMoveAnimationPlan(session, from, to, { reducedMotion: false });
 
     expect(plan.accepted).toBe(true);
+    expect(plan.boardBeforeMove[from.row][from.col]?.id).toBe(session.board[from.row][from.col]?.id);
+    expect(plan.resolution.phases[0]?.boardBefore[to.row][to.col]?.id).toBe(session.board[from.row][from.col]?.id);
     expect(plan.steps[0]).toMatchObject({ type: 'swap', durationMs: 180 });
     expect(plan.steps.map((step) => step.type)).toEqual(expect.arrayContaining(['clear', 'fall', 'refill']));
     expect(plan.steps.every((step) => step.durationMs <= 310)).toBe(true);

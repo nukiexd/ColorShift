@@ -63,7 +63,7 @@ export function resolveMove(board: Board, from: Coord, to: Coord, random: Random
   const movedFrom = getCell(current, to);
   const movedTo = getCell(current, from);
   const rainbowSwap = movedFrom?.special === 'rainbow' || movedTo?.special === 'rainbow';
-  let groups = orderGroups(findMatches(current));
+  let groups = expandedMatchGroups(current);
   if (!rainbowSwap && !groups.some((group) => group.cells.some((coord) => sameCoord(coord, from) || sameCoord(coord, to)))) {
     return rejected(board);
   }
@@ -107,7 +107,7 @@ export function resolveMove(board: Board, from: Coord, to: Coord, random: Random
     phases.push({ cascade, groups, cleared, createdSpecial: created, scoreDelta, backgroundColor,
       boardBefore, boardAfterClear, boardAfterGravity, boardAfterRefill });
     current = boardAfterRefill;
-    groups = orderGroups(findMatches(current));
+    groups = expandedMatchGroups(current);
     cascade += 1;
     specialInitial = null;
     rainbowColor = undefined;
@@ -144,19 +144,119 @@ export function shuffleToPlayable(board: Board, random: RandomSource): Board {
 }
 
 function chooseSpecial(groups: readonly MatchGroup[], playerAnchor?: Coord): { coord: Coord; special: Exclude<Special, null> } | null {
-  const qualifying = groups.filter((group) => group.cells.length >= 4);
-  if (qualifying.length === 0) return null;
-  const longest = Math.max(...qualifying.map((group) => group.cells.length));
-  const group = qualifying.find((candidate) => candidate.cells.length === longest) as MatchGroup;
-  const coord = playerAnchor && group.cells.some((cell) => sameCoord(cell, playerAnchor))
+  const components = connectedMatchComponents(groups).filter((component) => component.cells.length >= 4);
+  if (components.length === 0) return null;
+  const longest = Math.max(...components.map((component) => component.cells.length));
+  const component = components.find((candidate) => candidate.cells.length === longest) as ConnectedMatchComponent;
+  const coord = playerAnchor && component.cells.some((cell) => sameCoord(cell, playerAnchor))
     ? playerAnchor
-    : group.cells[Math.floor(group.cells.length / 2)];
-  const special: Exclude<Special, null> = group.cells.length >= 6
+    : component.cells[Math.floor(component.cells.length / 2)];
+  const special: Exclude<Special, null> = component.cells.length >= 6
     ? 'rainbow'
-    : group.cells.length === 5
+    : component.cells.length === 5
       ? 'bomb'
-      : group.orientation === 'horizontal' ? 'row' : 'column';
+      : componentOrientation(component) === 'horizontal' ? 'row' : 'column';
   return { coord, special };
+}
+
+function expandedMatchGroups(board: Board): MatchGroup[] {
+  return orderGroups(findMatches(board).map((group) => ({
+    ...group,
+    cells: connectedSameColorCells(board, group.color, group.cells),
+  })));
+}
+
+function connectedSameColorCells(board: Board, color: TileColor, starts: readonly Coord[]): Coord[] {
+  const seen = new Set<string>();
+  const queue: Coord[] = [];
+  const enqueue = (coord: Coord): void => {
+    if (!inBounds(board, coord) || getCell(board, coord)?.color !== color) return;
+    const key = coordKey(coord);
+    if (seen.has(key)) return;
+    seen.add(key);
+    queue.push(coord);
+  };
+  starts.forEach(enqueue);
+  for (let index = 0; index < queue.length; index += 1) {
+    adjacentCoords(queue[index]).forEach(enqueue);
+  }
+  return queue.sort((left, right) => left.row - right.row || left.col - right.col);
+}
+
+interface ConnectedMatchComponent {
+  readonly color: TileColor;
+  readonly cells: readonly Coord[];
+  readonly groups: readonly MatchGroup[];
+}
+
+function connectedMatchComponents(groups: readonly MatchGroup[]): ConnectedMatchComponent[] {
+  const byColor = new Map<TileColor, Map<string, Coord>>();
+  const groupKeys = new Map<MatchGroup, Set<string>>();
+  for (const group of groups) {
+    let colorCells = byColor.get(group.color);
+    if (!colorCells) {
+      colorCells = new Map();
+      byColor.set(group.color, colorCells);
+    }
+    const keys = new Set<string>();
+    for (const cell of group.cells) {
+      const key = coordKey(cell);
+      colorCells.set(key, cell);
+      keys.add(key);
+    }
+    groupKeys.set(group, keys);
+  }
+
+  const components: ConnectedMatchComponent[] = [];
+  for (const [color, cells] of byColor) {
+    const unseen = new Set(cells.keys());
+    while (unseen.size > 0) {
+      const start = unseen.values().next().value as string;
+      const queue = [start];
+      unseen.delete(start);
+      const componentKeys = new Set<string>([start]);
+      for (let index = 0; index < queue.length; index += 1) {
+        const coord = cells.get(queue[index]) as Coord;
+        for (const neighbor of adjacentCoords(coord)) {
+          const key = coordKey(neighbor);
+          if (unseen.has(key)) {
+            unseen.delete(key);
+            componentKeys.add(key);
+            queue.push(key);
+          }
+        }
+      }
+      const componentGroups = groups.filter((group) => group.color === color && intersects(groupKeys.get(group) as Set<string>, componentKeys));
+      const componentCells = [...componentKeys].map((key) => cells.get(key) as Coord)
+        .sort((left, right) => left.row - right.row || left.col - right.col);
+      components.push({ color, cells: componentCells, groups: componentGroups });
+    }
+  }
+  return components.sort((left, right) => left.cells[0].row - right.cells[0].row || left.cells[0].col - right.cells[0].col);
+}
+
+function componentOrientation(component: ConnectedMatchComponent): MatchGroup['orientation'] {
+  const straight = component.groups.find((group) => group.cells.length >= 4);
+  if (straight) return straight.orientation;
+  return component.groups[0]?.orientation ?? 'horizontal';
+}
+
+function adjacentCoords(coord: Coord): Coord[] {
+  return [
+    { row: coord.row - 1, col: coord.col },
+    { row: coord.row + 1, col: coord.col },
+    { row: coord.row, col: coord.col - 1 },
+    { row: coord.row, col: coord.col + 1 },
+  ];
+}
+
+function coordKey(coord: Coord): string {
+  return `${coord.row},${coord.col}`;
+}
+
+function intersects(left: ReadonlySet<string>, right: ReadonlySet<string>): boolean {
+  for (const key of left) if (right.has(key)) return true;
+  return false;
 }
 
 function orderGroups(groups: readonly MatchGroup[]): MatchGroup[] {

@@ -20,7 +20,37 @@ describe('BoardView', () => {
 
     expect(view.getAllByRole('button')).toHaveLength(36);
     expect(view.getByLabelText(`Блок ${firstColor}, строка 1, столбец 1`)).toBeTruthy();
-    expect(view.getAllByText(/[◆●■▲✦]/).length).toBeGreaterThan(0);
+    expect(view.queryByText(/[◆●■▲✦]/)).toBeNull();
+  });
+
+  test('shows marks only for special tiles', async () => {
+    const session = createSession(3);
+    const board = session.board.map((row, rowIndex) => row.map((tile, colIndex) => {
+      if (!tile) return tile;
+      return rowIndex === 0 && colIndex === 0 ? { ...tile, special: 'row' as const } : tile;
+    }));
+    const view = await render(<BoardView session={{ ...session, board }} width={360} onTapTile={jest.fn()} />);
+
+    expect(view.getByText('↔')).toBeTruthy();
+    expect(view.queryByText(/[◆●■▲✦]/)).toBeNull();
+  });
+
+  test('renders rainbow as a striped tile without a special icon', async () => {
+    const session = createSession(3);
+    const board = session.board.map((row, rowIndex) => row.map((tile, colIndex) => {
+      if (!tile) return tile;
+      return rowIndex === 0 && colIndex === 0 ? { ...tile, special: 'rainbow' as const } : tile;
+    }));
+    const view = await render(<BoardView session={{ ...session, board }} width={360} onTapTile={jest.fn()} />);
+
+    expect(view.getByTestId('rainbow-tile-0-0')).toBeTruthy();
+    expect(view.getByTestId('rainbow-stripe-coral-0-0')).toBeTruthy();
+    expect(view.getByTestId('rainbow-stripe-sky-0-0')).toBeTruthy();
+    expect(view.getByTestId('rainbow-stripe-mint-0-0')).toBeTruthy();
+    expect(view.getByTestId('rainbow-stripe-sun-0-0')).toBeTruthy();
+    expect(view.getByTestId('rainbow-stripe-plum-0-0')).toBeTruthy();
+    expect(view.getByTestId('rainbow-tile-0-0')).toHaveStyle({ inset: 0 });
+    expect(view.queryByText('◎')).toBeNull();
   });
 
   test('forwards tap events and exposes selected state', async () => {
@@ -38,6 +68,7 @@ describe('BoardView', () => {
     const onTapTile = jest.fn();
     const animationPlan: MoveAnimationPlan = {
       accepted: true,
+      boardBeforeMove: session.board,
       resolution: { accepted: true, board: session.board, phases: [], scoreDelta: 0, shuffled: false },
       steps: [{ type: 'swap', cascade: 0, durationMs: 180 }],
       randomState: session.randomState,
@@ -47,6 +78,21 @@ describe('BoardView', () => {
 
     fireEvent.press(view.getAllByRole('button')[0]);
     expect(onTapTile).not.toHaveBeenCalled();
+  });
+
+  test('does not visually dim tiles while input is locked by animation', async () => {
+    const session = createSession(3);
+    const animationPlan: MoveAnimationPlan = {
+      accepted: false,
+      boardBeforeMove: session.board,
+      resolution: { accepted: false, board: session.board, phases: [], scoreDelta: 0, shuffled: false },
+      steps: [{ type: 'swapBack', cascade: 0, durationMs: 80 }],
+      randomState: session.randomState,
+      tileIdCounter: session.tileIdCounter,
+    };
+    const view = await render(<BoardView session={session} width={360} animationPlan={animationPlan} onTapTile={jest.fn()} />);
+
+    expect(view.getAllByRole('button')[0]).not.toHaveStyle({ opacity: 0.94 });
   });
 
   test('marks tiles disabled while the session is paused', async () => {
@@ -71,8 +117,8 @@ describe('BoardView', () => {
       />,
     );
 
-    expect(view.getAllByRole('button')[0]).toHaveStyle({ transform: [{ translateX: 0 }, { translateY: 0 }] });
-    expect(view.getAllByRole('button')[1]).toHaveStyle({ transform: [{ translateX: -54 }, { translateY: 0 }] });
+    expect(view.getByTestId('tile-motion-0-0')).toHaveStyle({ transform: [{ translateX: 0 }, { translateY: 0 }] });
+    expect(view.getByTestId('tile-motion-0-1')).toHaveStyle({ transform: [{ translateX: -54 }, { translateY: 0 }] });
   });
 
   test('notifies when pending animation plan steps are consumed', async () => {
@@ -81,6 +127,7 @@ describe('BoardView', () => {
     const onAnimationPlanComplete = jest.fn();
     const animationPlan: MoveAnimationPlan = {
       accepted: true,
+      boardBeforeMove: session.board,
       resolution: { accepted: true, board: session.board, phases: [], scoreDelta: 0, shuffled: false },
       steps: [{ type: 'swap', cascade: 0, durationMs: 180 }],
       randomState: session.randomState,

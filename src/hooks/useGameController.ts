@@ -31,8 +31,8 @@ interface CommitOptions {
 export function gestureIntent(dx: number, dy: number, pitch: number, current: Direction | null): Direction | null {
   if (!Number.isFinite(dx) || !Number.isFinite(dy) || !Number.isFinite(pitch) || pitch <= 0) return null;
   const distance = Math.max(Math.abs(dx), Math.abs(dy));
-  if (current && distance < pitch * 0.24) return null;
-  if (!current && distance < pitch * 0.32) return null;
+  if (current && distance < pitch * 0.14) return null;
+  if (!current && distance < pitch * 0.22) return null;
   if (Math.abs(dx) >= Math.abs(dy)) return dx < 0 ? 'left' : 'right';
   return dy < 0 ? 'up' : 'down';
 }
@@ -51,7 +51,7 @@ export function tapTile(state: GameControllerState, coord: Coord, options: Commi
   return {
     state: { ...state, session: nextSession, selected: null, preview: null, panCommitted: nextSession !== state.session },
     accepted: nextSession !== state.session,
-    animationPlan: animationPlan.accepted ? animationPlan : undefined,
+    animationPlan,
   };
 }
 
@@ -69,10 +69,11 @@ export function releasePan(state: GameControllerState, options: CommitOptions = 
   if (!canAcceptInput(state) || state.panCommitted || !state.preview) return { state, accepted: false };
   const animationPlan = buildMoveAnimationPlan(state.session, state.preview.from, state.preview.to, { reducedMotion: options.reducedMotion ?? false });
   const nextSession = animationPlan.accepted ? sessionFromPlan(state.session, animationPlan) : state.session;
+  const accepted = nextSession !== state.session;
   return {
-    state: { ...state, session: nextSession, selected: null, preview: null, panCommitted: true },
-    accepted: nextSession !== state.session,
-    animationPlan: animationPlan.accepted ? animationPlan : undefined,
+    state: { ...state, session: nextSession, selected: null, preview: null, panCommitted: accepted },
+    accepted,
+    animationPlan,
   };
 }
 

@@ -1,5 +1,4 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { PrimaryButton } from '../PrimaryButton';
 import { Settings } from '../../storage/schema';
 import { colors, radii, spacing, typography } from '../../ui/tokens';
 import { SheetFrame } from './SheetFrame';
@@ -11,21 +10,11 @@ interface SettingsSheetProps {
 }
 
 export function SettingsSheet({ settings, onClose, onUpdate }: SettingsSheetProps) {
-  const volumePercent = Math.round(settings.effectsVolume * 100);
+  const soundEnabled = settings.effectsVolume > 0;
   return (
     <SheetFrame title="Настройки" onClose={onClose}>
-      <View style={styles.row}>
-        <Text style={styles.label}>Громкость {volumePercent}%</Text>
-        <PrimaryButton
-          variant="secondary"
-          label="+"
-          accessibilityLabel="Увеличить громкость эффектов"
-          onPress={() => onUpdate({ effectsVolume: Math.min(1, settings.effectsVolume + 0.1) })}
-          style={styles.smallButton}
-        />
-      </View>
+      <SwitchRow label="Звук" checked={soundEnabled} onPress={() => onUpdate({ effectsVolume: soundEnabled ? 0 : 0.35 })} />
       <SwitchRow label="Вибрация" checked={settings.haptics} onPress={() => onUpdate({ haptics: !settings.haptics })} />
-      <SwitchRow label="Меньше анимации" checked={settings.reducedMotion} onPress={() => onUpdate({ reducedMotion: !settings.reducedMotion })} />
     </SheetFrame>
   );
 }
@@ -63,10 +52,6 @@ const styles = StyleSheet.create({
     fontFamily: typography.family,
     fontSize: 16,
     fontWeight: '700',
-  },
-  smallButton: {
-    width: 56,
-    paddingHorizontal: 0,
   },
   switchTrack: {
     width: 52,
