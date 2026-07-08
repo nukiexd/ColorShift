@@ -27,7 +27,7 @@ export function adaptiveGlowConfig(color: TileColor | null, reducedMotion: boole
 export function AdaptiveBackground({ color, reducedMotion = false, children }: AdaptiveBackgroundProps) {
   const glow = adaptiveGlowConfig(color, reducedMotion);
   return (
-    <View style={styles.base}>
+    <View testID="adaptive-background-root" style={styles.base}>
       <View pointerEvents="none" testID="adaptive-background-glow" style={[styles.glow, { backgroundColor: glow.backgroundColor, opacity: glow.opacity }]} />
       {children}
     </View>
@@ -38,6 +38,7 @@ const styles = StyleSheet.create({
   base: {
     flex: 1,
     backgroundColor: colors.background,
+    overflow: 'hidden',
   },
   glow: {
     position: 'absolute',

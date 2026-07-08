@@ -49,6 +49,17 @@ describe('BoardView', () => {
     expect(onTapTile).not.toHaveBeenCalled();
   });
 
+  test('marks tiles disabled while the session is paused', async () => {
+    const session = { ...createSession(3), phase: 'paused' as const };
+    const onTapTile = jest.fn();
+    const view = await render(<BoardView session={session} width={360} onTapTile={onTapTile} />);
+
+    const firstTile = view.getAllByRole('button')[0];
+    expect(firstTile.props.accessibilityState).toMatchObject({ disabled: true });
+    fireEvent.press(firstTile);
+    expect(onTapTile).not.toHaveBeenCalled();
+  });
+
   test('moves only the neighbor tile during stationary swap preview', async () => {
     const session = createSession(3);
     const view = await render(

@@ -48,4 +48,15 @@ describe('feedback service', () => {
     expect(() => feedback.lightImpact()).not.toThrow();
     expect(haptics.impactAsync).not.toHaveBeenCalled();
   });
+
+  test('contains asynchronous browser playback rejections', () => {
+    const playback = { catch: jest.fn() };
+    const player = { volume: 0, playbackRate: 1, seekTo: jest.fn(), play: jest.fn(() => playback) };
+    audio.createAudioPlayer.mockReturnValue(player as never);
+    const feedback = createFeedback({ effectsVolume: 0.8, haptics: true, reducedMotion: false });
+
+    feedback.play('swap');
+
+    expect(playback.catch).toHaveBeenCalledTimes(1);
+  });
 });

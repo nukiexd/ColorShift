@@ -9,6 +9,10 @@ Date: 8 July 2026
 - Commit/push: not performed
 - Subagents/review agents: not used
 
+## Current Task 8 status
+
+Task 8 local release-candidate verification is complete in this single-agent chat. Commit and push were intentionally not performed by user request.
+
 ## Current Task 7 status
 
 Task 7 implementation is complete in this single-agent chat. Pause, continue, confirmed restart, finish, results, settled-session restore, local sound effects, optional haptics, and session-flow/feedback tests are implemented. Specification and quality review were performed inline without separate review agents, following the user's restriction.
@@ -70,5 +74,20 @@ Task 7 implementation is complete in this single-agent chat. Pause, continue, co
 ## What remains after Task 7
 
 - No Task 7 implementation work remains.
-- Task 8 was intentionally not started.
+- Task 8 has now been completed locally; commit/push still require user approval.
 - Commit and push were intentionally not performed.
+
+## Task 8 local release-candidate checkpoint
+
+- Added release-surface regression coverage for the allowed Expo Router routes.
+- Removed the scaffold `/explore` route.
+- Clipped the adaptive background glow to prevent narrow web viewport overflow.
+- Marked board tiles disabled whenever the session is not idle, including paused restore.
+- Added explicit `aria-checked` for settings switches on web.
+- Contained asynchronous browser audio playback rejections.
+- Updated README, TASKS, and docs/InProgress.md.
+- Browser QA covered 360×800, 390×844, and 430×932 viewports, pause/restart/finish/restore, reduced motion persistence, reload restore, touch targets, and color-independent tile marks.
+
+## What remains after Task 8
+
+- Commit and push only after user approval.

@@ -2,7 +2,7 @@
 
 > Живой статус разработки Endless MVP. Файл обновляется после каждого завершённого шага и каждого review-gate.
 >
-> Последнее обновление: 7 июля 2026
+> Последнее обновление: 8 июля 2026
 >
 > Рабочая ветка: feature/endless-mvp
 
@@ -29,8 +29,8 @@
 | 4. Сессия, сохранение, прогресс | 🟡 На проверке | 77b494e |
 | 5. Дизайн-система и главный экран | 🟡 Реализовано, ждёт review | — |
 | 6. Игровое поле, жесты, анимации | 🟡 Частично реализовано | — |
-| 7. Пауза, результаты, звук | ⏳ Не начат | — |
-| 8. Доступность, QA, релиз | ⏳ Не начат | — |
+| 7. Пауза, результаты, звук | ✅ Завершён локально | — |
+| 8. Доступность, QA, релиз | ✅ Завершён локально, commit/push ожидают решения пользователя | — |
 
 ## 0. Проектирование и безопасность
 
@@ -237,28 +237,40 @@
 
 ## 8. Доступность, QA и релизная проверка
 
-- [ ] Проверить test suite с coverage.
-- [ ] Проверить TypeScript.
-- [ ] Проверить Expo lint.
-- [ ] Проверить Expo Doctor.
-- [ ] Собрать Expo web export.
-- [ ] Проверить отсутствие отслеживаемых .env-файлов.
-- [ ] Проверить экран 360×800.
-- [ ] Проверить экран 390×844.
-- [ ] Проверить экран 430×932.
-- [ ] Проверить safe areas.
-- [ ] Проверить минимальные touch targets.
-- [ ] Проверить читаемость блоков без опоры только на цвет.
-- [ ] Проверить быстрые повторные касания во время каскада.
-- [ ] Проверить pause, restart, finish и restore.
-- [ ] Проверить reduced motion и сохранение настроек.
-- [ ] Проверить уход приложения в background и возврат.
-- [ ] Обновить README с запуском, управлением и ограничениями MVP.
-- [ ] Указать в README запрет на коммит .env.
-- [ ] Выполнить финальный review всего diff.
-- [ ] Выполнить финальную verification-before-completion.
-- [ ] Обновить все пункты InProgress.
-- [ ] Запушить release-candidate ветку.
+- [x] Проверить test suite с coverage.
+- [x] Проверить TypeScript.
+- [x] Проверить Expo lint.
+- [x] Проверить Expo Doctor.
+- [x] Собрать Expo web export.
+- [x] Проверить отсутствие отслеживаемых .env-файлов.
+- [x] Проверить экран 360×800.
+- [x] Проверить экран 390×844.
+- [x] Проверить экран 430×932.
+- [x] Проверить safe areas.
+- [x] Проверить минимальные touch targets.
+- [x] Проверить читаемость блоков без опоры только на цвет.
+- [x] Проверить быстрые повторные касания во время каскада.
+- [x] Проверить pause, restart, finish и restore.
+- [x] Проверить reduced motion и сохранение настроек.
+- [x] Проверить уход приложения в background и возврат через browser reload restore.
+- [x] Обновить README с запуском, управлением и ограничениями MVP.
+- [x] Указать в README запрет на коммит .env.
+- [x] Выполнить финальный review всего diff.
+- [x] Выполнить финальную verification-before-completion.
+- [x] Обновить все пункты InProgress.
+- [ ] Commit/push release-candidate ветки ожидает решения пользователя.
+
+### Task 8 checkpoint — 8 July 2026
+
+- [x] Added release-surface regression coverage so Expo Router only exposes `/`, `/game`, and `/results`.
+- [x] Removed the scaffold `/explore` route from the release surface.
+- [x] Clipped the adaptive background glow so narrow web/mobile viewports do not gain horizontal overflow.
+- [x] Marked board tiles disabled whenever the session is not idle, including paused restore.
+- [x] Added explicit `aria-checked` for settings switches on web.
+- [x] Contained asynchronous browser audio playback rejections from autoplay policy.
+- [x] Browser QA passed at 360×800, 390×844, and 430×932 for board fit, touch targets, color-independent marks, pause/restart/finish/restore, reduced motion persistence, and reload restore.
+- [x] README, TASKS, and InProgress were updated for the Task 8 local release-candidate checkpoint.
+- [ ] Commit and push were intentionally not performed by user request.
 
 ## Вне Endless MVP
 

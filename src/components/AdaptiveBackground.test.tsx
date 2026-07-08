@@ -14,5 +14,6 @@ describe('AdaptiveBackground', () => {
       </AdaptiveBackground>,
     );
     expect(view.getByTestId('adaptive-background-glow').props.style).toEqual(expect.arrayContaining([expect.objectContaining({ opacity: 0.18 })]));
+    expect(view.getByTestId('adaptive-background-root').props.style).toEqual(expect.objectContaining({ overflow: 'hidden' }));
   });
 });

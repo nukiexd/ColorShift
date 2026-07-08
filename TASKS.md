@@ -6,7 +6,7 @@ Last updated: 8 July 2026
 
 Active branch: feature/endless-mvp
 
-Current focus: Task 7 implementation checkpoint
+Current focus: Task 8 local release-candidate verification
 
 ## Status
 
@@ -18,7 +18,7 @@ Current focus: Task 7 implementation checkpoint
 - [ ] Task 5 — build the design system, home screen, profile, settings, and mode picker
 - [ ] Task 6 — build the animated board, tap controls, tracked directional gestures, and adaptive background
 - [x] Task 7 — add pause, results, session restore, sound effects, and haptics
-- [ ] Task 8 — complete accessibility, device QA, documentation, and release verification
+- [x] Task 8 — complete accessibility, device QA, documentation, and release verification locally
 
 ## Task 4 remaining
 
@@ -66,13 +66,13 @@ Current focus: Task 7 implementation checkpoint
 
 ## Task 8 preview
 
-- [ ] Run full test coverage, TypeScript, lint, Expo Doctor, and Expo export
-- [ ] Verify 360×800, 390×844, and 430×932 layouts
-- [ ] Verify safe areas, touch targets, color-independent marks, and reduced motion
-- [ ] Verify pause, restart, finish, restore, and background/foreground behavior
-- [ ] Confirm no environment files or secrets are tracked
-- [ ] Complete final code review and release verification
-- [ ] Mark docs/InProgress.md complete and push the release candidate
+- [x] Run full test coverage, TypeScript, lint, Expo Doctor, and Expo export
+- [x] Verify 360×800, 390×844, and 430×932 layouts
+- [x] Verify safe areas, touch targets, color-independent marks, and reduced motion
+- [x] Verify pause, restart, finish, restore, and background/foreground behavior
+- [x] Confirm no environment files or secrets are tracked
+- [x] Complete final code review and release verification
+- [ ] Commit and push the release candidate after user approval
 
 ## Deferred beyond Endless MVP
 

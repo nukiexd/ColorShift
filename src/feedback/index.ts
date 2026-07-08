@@ -38,7 +38,10 @@ export function createFeedback(settings: Settings): Feedback {
         player.volume = volume;
         player.playbackRate = cue === 'cascade' ? cascadeRate(cascadeDepth) : 1;
         player.seekTo(0);
-        player.play();
+        const playback = player.play() as unknown;
+        if (playback && typeof (playback as { catch?: unknown }).catch === 'function') {
+          void (playback as Promise<void>).catch(() => undefined);
+        }
       } catch {
         // Feedback is best-effort and intentionally isolated from session flow.
       }

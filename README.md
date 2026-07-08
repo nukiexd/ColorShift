@@ -14,9 +14,10 @@ Completed foundations:
 - cascades and score multipliers;
 - row/column stripes, 3×3 bombs, and rainbows;
 - safe shuffle recovery;
-- versioned local session, profile, settings, XP, and best-score storage.
+- versioned local session, profile, settings, XP, and best-score storage;
+- home, settings, profile, Endless game, pause, results, restore, sound, haptics, accessibility, and release verification coverage.
 
-The session layer is currently under review. The main UI, animated board, audio, final accessibility pass, and release QA remain in progress.
+The Endless MVP is in release-candidate verification. Time Attack, Demining, custom avatars, accounts, leaderboards, monetization, and background music are intentionally outside this milestone.
 
 See [TASKS.md](TASKS.md) for the concise checklist and [docs/InProgress.md](docs/InProgress.md) for detailed status.
 
@@ -35,7 +36,7 @@ See [TASKS.md](TASKS.md) for the concise checklist and [docs/InProgress.md](docs
 Both input styles remain available:
 
 - Tap one tile, then tap an adjacent tile.
-- Hold a tile and move toward a neighbor. The held tile stays in place; after the directional threshold, the pair previews the swap. Releasing commits one swap and moving back cancels it.
+- Hold a tile and move toward a neighbor. The held tile stays in place. A swap preview starts at 32% of the cell pitch and cancels below 24%; releasing while the preview is active commits one adjacent swap.
 
 ## Visual direction
 
@@ -86,6 +87,10 @@ Run tests:
 
     npm.cmd test
 
+Run tests with coverage:
+
+    npm.cmd test -- --coverage
+
 Run TypeScript checks:
 
     npm.cmd run typecheck
@@ -126,7 +131,7 @@ Create a web export:
 
 The MVP stores nickname, level, XP, settings, best score, and a settled active session locally on the device. It has no account system, cloud synchronization, analytics, or online leaderboard.
 
-Environment files and credentials must never be committed.
+Never commit `.env`, `.env.*`, credentials, access tokens, or other secrets. Local environment files are ignored by git and are not required for the MVP.
 
 ## Later milestones
 

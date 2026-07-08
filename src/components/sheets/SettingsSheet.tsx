@@ -32,7 +32,14 @@ export function SettingsSheet({ settings, onClose, onUpdate }: SettingsSheetProp
 
 function SwitchRow({ label, checked, onPress }: { readonly label: string; readonly checked: boolean; readonly onPress: () => void }) {
   return (
-    <Pressable accessibilityRole="switch" accessibilityLabel={label} accessibilityState={{ checked }} onPress={onPress} style={styles.row}>
+    <Pressable
+      accessibilityRole="switch"
+      accessibilityLabel={label}
+      accessibilityState={{ checked }}
+      aria-checked={checked}
+      onPress={onPress}
+      style={styles.row}
+    >
       <Text style={styles.label}>{label}</Text>
       <View style={[styles.switchTrack, checked && styles.switchTrackOn]}>
         <View style={[styles.switchThumb, checked && styles.switchThumbOn]} />

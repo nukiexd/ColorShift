@@ -56,6 +56,7 @@ export function BoardView({
   const stepIndex = playback.plan === animationPlan ? playback.stepIndex : 0;
   const activeStep = animationPlan?.steps[stepIndex] ?? null;
   const resolving = Boolean(animationPlan && animationPlan.steps.length > 0 && activeStep);
+  const inputDisabled = resolving || session.phase !== 'idle';
   const board = activeStep && animationPlan ? boardForAnimationStep(session.board, animationPlan, activeStep) : session.board;
   const tileGestures = new Map<string, ReturnType<typeof PanResponder.create>['panHandlers']>();
 
@@ -84,11 +85,11 @@ export function BoardView({
           coord={{ row: rowIndex, col: colIndex }}
           size={layout.tileSize}
           selected={selected?.row === rowIndex && selected.col === colIndex}
-          disabled={resolving}
-          style={tileStyle(rowIndex, colIndex, layout, preview, resolving)}
-          gestureHandlers={tileGestureHandlers(tileGestures, { row: rowIndex, col: colIndex }, resolving, layout.pitch, onPanMove, onPanRelease)}
+          disabled={inputDisabled}
+          style={tileStyle(rowIndex, colIndex, layout, preview, inputDisabled)}
+          gestureHandlers={tileGestureHandlers(tileGestures, { row: rowIndex, col: colIndex }, inputDisabled, layout.pitch, onPanMove, onPanRelease)}
           onPress={(coord) => {
-            if (!resolving) onTapTile(coord);
+            if (!inputDisabled) onTapTile(coord);
           }}
         />
       ) : null))}
